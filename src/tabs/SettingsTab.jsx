@@ -36,7 +36,7 @@ export function SettingsTab({ users, me, setUsers, onLogout, dark, setDark, noti
           <span>Desktop notifications</span>
           <button className={"toggle " + (notifOn ? "toggle-on" : "")} onClick={enableNotifs} aria-label="Enable notifications"><span className="toggle-knob" /></button>
         </div>
-        <p className="muted-small">Notifications fire for tasks and invoices due soon, plus a daily nudge to check yesterday's report. They show while Crica is open in a tab.</p>
+        <p className="muted-small">Reminders fire for tasks and invoices due soon, plus a daily nudge to check yesterday's report. On Chrome and Edge they can arrive even when Crica is closed. On other browsers they show while a tab is open.</p>
       </Card>
 
       <Card>

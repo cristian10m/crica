@@ -106,12 +106,15 @@ Netlify works the same way if you prefer it. Firebase Hosting is also an option 
 - `npm run dev` runs it locally while you tinker.
 - Push to GitHub to update the live site.
 - Settings has dark mode, notifications, your name, color, and password.
-- Notifications and the daily report popup work while the site is open in a browser tab. Web apps cannot pop up reminders when every tab is fully closed without extra background setup, so keep a tab open during the workday for the nudges.
+- The purple Focus button floats in the corner on every screen. Tap it to run a focus session.
+- Reminders: on Chrome and Edge (desktop and Android) Crica pre-schedules its reminders, so the daily nudge and due-task and invoice alerts can arrive even when Crica is fully closed. On Safari and Firefox there is no web standard for that yet, so on those browsers reminders show while a tab is open. If you want bulletproof reminders on every browser and device even when closed, that needs a small server piece (Firebase Cloud Messaging plus a scheduled function on the Blaze plan, which is still free at this size). Tell me and I will add it.
 
 ## How points work
 
 - Every habit kept is worth 10 points for that day. They are all hard to keep, so they all count the same.
 - Tasks pay on completion by importance: Low 5, Medium 10, High 20, Urgent 35.
+- Up for grabs: in the Tasks tab there is a shared bounty board. Add a job, set its points, and either of you can claim it when you start. Claiming moves it to your board, and finishing it pays the points you set. The top bar shows a red count of how many bounties are still unclaimed.
+- Focus sessions: tap the floating Focus button, pick a length, and work. You earn 5 points per hour of focus (1 point every 12 minutes), banked when the session ends. The timer only counts while Crica is open and in front of you, a single session is capped, and closing the tab pauses it without crediting the gap, so the points cannot be inflated by leaving it running.
 - Miss a habit one day and the streak freezes with a warning. Miss two days in a row and it resets.
 
 ## If something looks off

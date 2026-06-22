@@ -6,6 +6,7 @@ import { Home, Repeat, CheckSquare, PiggyBank, CalendarDays, Settings, Clock, Re
 import { GlobalStyle } from "./styles";
 import { Avatar, Modal, Btn, WideLogo, IconMark } from "./components/ui";
 import { AlertBar } from "./components/AlertBar";
+import { FocusFab, FocusOverlay } from "./components/Focus";
 import { LoginScreen } from "./screens/LoginScreen";
 import { DbErrorScreen } from "./screens/DbErrorScreen";
 import { Dashboard } from "./tabs/Dashboard";
@@ -18,6 +19,9 @@ import { SettingsTab } from "./tabs/SettingsTab";
 import { todayStr, dateDiff } from "./lib/dates";
 import { nextInvoiceDate } from "./lib/invoices";
 import { notify } from "./lib/notify";
+import { scheduleReminders } from "./lib/reminders";
+import { useFocusEngine } from "./lib/focus";
+import { uid } from "./lib/format";
 import { DEFAULT_USERS, DEFAULT_FINANCE } from "./lib/constants";
 
 const TABS = [
@@ -42,11 +46,21 @@ export default function App() {
   const [tasks, setTasksState] = useState([]);
   const [clients, setClientsState] = useState([]);
   const [finance, setFinanceState] = useState(DEFAULT_FINANCE);
+  const [focus, setFocusState] = useState([]);
 
   const [dark, setDark] = useState(() => { try { return localStorage.getItem("crica_theme") === "dark"; } catch (e) { return false; } });
   const [notifOn, setNotifOn] = useState(() => typeof Notification !== "undefined" && Notification.permission === "granted");
   const [dailyPrompt, setDailyPrompt] = useState(false);
+  const [tasksBoard, setTasksBoard] = useState(null);
+  const [focusOpen, setFocusOpen] = useState(false);
   const notifiedRef = useRef(new Set());
+
+  const bankFocus = useCallback(({ seconds, points }) => {
+    const rec = { id: uid(), userId: currentUserId, date: todayStr(), seconds, points, endedAt: Date.now() };
+    setFocusState((prev) => { const next = [...(prev || []), rec]; saveKey("focus", next); return next; });
+  }, [currentUserId]);
+
+  const focusEngine = useFocusEngine({ onBank: bankFocus });
 
   // Bootstrap: require Firebase. If it is missing or unreachable, fail loudly.
   useEffect(() => {
@@ -80,6 +94,7 @@ export default function App() {
       subscribeKey("tasks", (t) => setTasksState(t || [])),
       subscribeKey("clients", (c) => setClientsState(c || [])),
       subscribeKey("finance", (f) => { if (f) setFinanceState(f); }),
+      subscribeKey("focus", (f) => setFocusState(f || [])),
     ];
     return () => unsubs.forEach((u) => { try { u && u(); } catch (e) { /* ignore */ } });
   }, []);
@@ -142,6 +157,8 @@ export default function App() {
     return out.filter((a) => { if (seen.has(a.text)) return false; seen.add(a.text); return true; }).slice(0, 8);
   }, [tasks, clients, me, users]);
 
+  const openCount = useMemo(() => tasks.filter((t) => t.pool).length, [tasks]);
+
   // Once a day, after login, prompt to review yesterday's report
   useEffect(() => {
     if (!currentUserId) return;
@@ -165,6 +182,17 @@ export default function App() {
     });
   }, [alerts, notifOn, currentUserId]);
 
+  // Bring up the focus overlay to celebrate when a session finishes
+  useEffect(() => {
+    if (focusEngine.session && focusEngine.session.phase === "done") setFocusOpen(true);
+  }, [focusEngine.session?.phase]);
+
+  // Pre-schedule background reminders (Chrome and Edge); harmless elsewhere
+  useEffect(() => {
+    if (!notifOn || !me) return;
+    scheduleReminders({ tasks, clients, me });
+  }, [tasks, clients, me, notifOn]);
+
   if (dbError) return <><GlobalStyle /><DbErrorScreen kind={dbError} /></>;
   if (loading || !users) return <><GlobalStyle /><div className="boot"><div className="boot-mark"><IconMark size={56} radius={14} /></div></div></>;
   if (!currentUserId || !me) return <><GlobalStyle /><LoginScreen users={users} onLogin={loginAs} /></>;
@@ -172,11 +200,11 @@ export default function App() {
   const renderTab = () => {
     if (showSettings) return <SettingsTab users={users} me={me} setUsers={setUsers} onLogout={logout} dark={dark} setDark={setDark} notifOn={notifOn} enableNotifs={enableNotifs} />;
     switch (tab) {
-      case "dashboard": return <Dashboard users={users} me={me} habits={habits} tasks={tasks} finance={finance} />;
+      case "dashboard": return <Dashboard users={users} me={me} habits={habits} tasks={tasks} finance={finance} focus={focus} />;
       case "habits": return <HabitsTab users={users} me={me} habits={habits} setHabits={setHabits} />;
-      case "tasks": return <TasksTab users={users} me={me} tasks={tasks} setTasks={setTasks} clients={clients} />;
+      case "tasks": return <TasksTab users={users} me={me} tasks={tasks} setTasks={setTasks} clients={clients} board={tasksBoard} setBoard={setTasksBoard} />;
       case "vault": return <CompanyTab finance={finance} setFinance={setFinance} clients={clients} setClients={setClients} />;
-      case "report": return <DailyReport users={users} habits={habits} tasks={tasks} />;
+      case "report": return <DailyReport users={users} habits={habits} tasks={tasks} focus={focus} />;
       default: return null;
     }
   };
@@ -197,7 +225,7 @@ export default function App() {
             </nav>
             <button className="header-me" onClick={() => setShowSettings(true)}><Avatar user={me} size={30} /></button>
           </header>
-          <AlertBar alerts={alerts} />
+          <AlertBar alerts={alerts} openCount={openCount} onOpen={() => { setTasksBoard("pool"); setShowSettings(false); setTab("tasks"); }} />
         </div>
 
         <main className="app-main">{renderTab()}</main>
@@ -213,6 +241,10 @@ export default function App() {
           </button>
         </nav>
       </div>
+
+      <FocusFab session={focusEngine.session} onOpen={() => setFocusOpen(true)} />
+      <FocusOverlay open={focusOpen} engine={focusEngine}
+        onClose={() => { setFocusOpen(false); if (focusEngine.session?.phase === "done") focusEngine.dismiss(); }} />
 
       <Modal open={dailyPrompt} onClose={() => dismissDaily(false)} title={`Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, ${me?.name || ""}`}>
         <p style={{ margin: "0 0 16px", color: "var(--ink-2)", fontSize: 15, lineHeight: 1.5 }}>

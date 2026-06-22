@@ -3,11 +3,11 @@ import {
   BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
 import {
-  CheckSquare, Flame, TrendingUp, PiggyBank, ChevronLeft, ChevronRight, Crown, Star, Award, Zap, Trophy,
+  CheckSquare, Flame, TrendingUp, PiggyBank, ChevronLeft, ChevronRight, Crown, Star, Award, Zap, Trophy, Timer,
 } from "lucide-react";
 import { Card, IconBtn, Avatar, Ring, PageHead } from "../components/ui";
 import { useCountUp } from "../lib/hooks";
-import { pointsOnDay, pointsInRange, totalPoints, evalHabit } from "../lib/points";
+import { pointsOnDay, pointsInRange, totalPoints, evalHabit, focusSecondsInRange } from "../lib/points";
 import { weekDates, startOfWeek, todayStr, parseDate, WEEKDAY, addDays, dateDiff, monthKey, prettyDate } from "../lib/dates";
 import { BLUE } from "../lib/constants";
 import { fmtMoney } from "../lib/format";
@@ -24,20 +24,21 @@ function StatTile({ icon, label, value, accent }) {
   );
 }
 
-export function Dashboard({ users, me, habits, tasks, finance }) {
+export function Dashboard({ users, me, habits, tasks, finance, focus = [] }) {
   const [anchor, setAnchor] = useState(todayStr());
   const week = useMemo(() => weekDates(anchor), [anchor]);
   const isCurrentWeek = startOfWeek(anchor) === startOfWeek(todayStr());
 
   const chartData = week.map((d) => {
     const row = { day: WEEKDAY[parseDate(d).getDay()], date: d };
-    users.forEach((u, i) => { row["u" + i] = pointsOnDay(u.id, d, habits, tasks); });
+    users.forEach((u, i) => { row["u" + i] = pointsOnDay(u.id, d, habits, tasks, focus); });
     return row;
   });
 
   const weekFrom = week[0], weekTo = week[6];
-  const weekPoints = users.map((u) => pointsInRange(u.id, weekFrom, weekTo, habits, tasks));
-  const allTime = users.map((u) => totalPoints(u.id, habits, tasks));
+  const weekPoints = users.map((u) => pointsInRange(u.id, weekFrom, weekTo, habits, tasks, focus));
+  const allTime = users.map((u) => totalPoints(u.id, habits, tasks, focus));
+  const myFocusSecWeek = focusSecondsInRange(me.id, weekFrom, weekTo, focus);
 
   const tasksDoneWeek = users.map((u) => tasks.filter((t) => { const c = (t.completed || {})[u.id]; return c && c >= weekFrom && c <= weekTo; }).length);
 
@@ -103,6 +104,7 @@ export function Dashboard({ users, me, habits, tasks, finance }) {
         <StatTile icon={<CheckSquare size={18} />} label="Your tasks this week" value={tasksDoneWeek[myIdx]} />
         <StatTile icon={<Flame size={18} />} label="Best streak" value={bestStreak} accent="#FF9500" />
         <StatTile icon={<TrendingUp size={18} />} label="Your points (all time)" value={allTime[myIdx]} />
+        <StatTile icon={<Timer size={18} />} label="Your focus this week" value={(() => { const m = Math.round(myFocusSecWeek / 60); return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`; })()} accent="#AF52DE" />
         <StatTile icon={<PiggyBank size={18} />} label="Income this month" value={fmtMoney(monthIncome)} accent="#34C759" />
       </div>
 

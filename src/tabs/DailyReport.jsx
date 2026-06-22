@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, CalendarDays, Crown, CheckSquare, Repeat, Check } from "lucide-react";
+import { ChevronLeft, ChevronRight, CalendarDays, Crown, CheckSquare, Repeat, Check, Timer } from "lucide-react";
 import { Card, IconBtn, Avatar, PageHead } from "../components/ui";
-import { pointsOnDay } from "../lib/points";
+import { pointsOnDay, focusSecondsInRange } from "../lib/points";
 import { addDays, todayStr, dateDiff, prettyDate } from "../lib/dates";
 
-export function DailyReport({ users, habits, tasks }) {
+export function DailyReport({ users, habits, tasks, focus = [] }) {
   const [day, setDay] = useState(addDays(todayStr(), -1));
   const isYesterday = day === addDays(todayStr(), -1);
   const canForward = dateDiff(todayStr(), day) > 0;
@@ -12,8 +12,9 @@ export function DailyReport({ users, habits, tasks }) {
   const data = users.map((u) => {
     const tasksDone = tasks.filter((t) => (t.completed || {})[u.id] === day);
     const habitsDone = habits.filter((h) => h.ownerId === u.id && (h.completions || {})[day]);
-    const pts = pointsOnDay(u.id, day, habits, tasks);
-    return { user: u, tasksDone, habitsDone, pts };
+    const focusMin = Math.round(focusSecondsInRange(u.id, day, day, focus) / 60);
+    const pts = pointsOnDay(u.id, day, habits, tasks, focus);
+    return { user: u, tasksDone, habitsDone, focusMin, pts };
   });
   const winner = data[0].pts === data[1].pts ? null : (data[0].pts > data[1].pts ? 0 : 1);
 
@@ -39,6 +40,7 @@ export function DailyReport({ users, habits, tasks }) {
             <div className="report-big" style={{ color: d.user.color }}>{d.pts}<span>pts</span></div>
             <div className="report-line"><CheckSquare size={14} /> {d.tasksDone.length} task{d.tasksDone.length === 1 ? "" : "s"} done</div>
             <div className="report-line"><Repeat size={14} /> {d.habitsDone.length} habit{d.habitsDone.length === 1 ? "" : "s"} kept</div>
+            {d.focusMin > 0 && <div className="report-line"><Timer size={14} /> {d.focusMin} min focused</div>}
             {d.tasksDone.length > 0 && (
               <div className="report-tasks">
                 {d.tasksDone.slice(0, 6).map((t) => <div key={t.id} className="report-task"><Check size={12} /> {t.title}</div>)}
