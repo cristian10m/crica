@@ -1,22 +1,21 @@
 // ============================================================
-// Firebase setup for Crica
+// Firebase setup for Crica  (Realtime Database)
 // ------------------------------------------------------------
-// This is what makes the data sync between both PCs.
+// This connects Crica to your Firebase Realtime Database so both
+// founders share the same live data across different computers.
 //
-// One-time setup (takes about 5 minutes):
-//  1. Go to https://console.firebase.google.com and click "Add project".
-//     Give it a name (e.g. "crica"), you can skip Google Analytics.
-//  2. Inside the project, open "Build" > "Firestore Database" > "Create database".
-//     Choose "Start in test mode" while you are building, pick the closest region.
-//  3. Back on the project overview, click the web icon "</>" to register a web app.
-//     Name it "crica", do NOT enable Hosting yet, click "Register app".
-//  4. Firebase shows you a config object. Copy those values into the object below.
+// Your config is already filled in below. If you ever regenerate the
+// project, replace these values with the new ones from:
+//   Firebase console > Project settings > Your apps > SDK setup and config
 //
-// Until you fill this in, Crica still runs: it just keeps data on this one
-// computer (no sync). Once the values are in, both PCs share the same data live.
+// IMPORTANT: the database needs rules that allow access. In the Firebase
+// console open Realtime Database > Rules and set them to:
+//   { "rules": { ".read": true, ".write": true } }
+// then click Publish. (This is open access, fine for a private two-person
+// tool while you build. Lock it down later when you want.)
 // ============================================================
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import { getDatabase } from "firebase/database";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDrVTA4cVamz7TU9DE63YLVctVgryks8iI",
@@ -25,21 +24,16 @@ const firebaseConfig = {
   projectId: "crica-b8859",
   storageBucket: "crica-b8859.firebasestorage.app",
   messagingSenderId: "892951368395",
-  appId: "1:892951368395:web:5d02cd71f36d663aad414e"
+  appId: "1:892951368395:web:5d02cd71f36d663aad414e",
 };
 
 export const firebaseConfigured =
-  !!firebaseConfig.projectId && firebaseConfig.projectId !== "REPLACE_ME";
+  !!firebaseConfig.databaseURL && !firebaseConfig.databaseURL.includes("REPLACE_ME");
 
 let db = null;
 if (firebaseConfigured) {
   const app = initializeApp(firebaseConfig);
-  db = getFirestore(app);
-} else {
-  console.warn(
-    "[Crica] Firebase is not configured yet, so data stays on this computer only. " +
-    "Add your config in src/firebase.js to sync across both PCs."
-  );
+  db = getDatabase(app);
 }
 
 export { db };

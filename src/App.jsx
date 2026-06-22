@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { loadKey, saveKey, subscribeKey } from "./storage";
+import { firebaseConfigured } from "./firebase";
 import {
   LineChart, Line, BarChart, Bar, AreaChart, Area, PieChart, Pie, Cell,
   RadialBarChart, RadialBar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
@@ -228,8 +229,18 @@ function Avatar({ user, size = 34 }) {
   );
 }
 
-/* Logo: uses /logo.png if present, falls back to the crown mark */
-function Logo({ size = 28, radius = 9 }) {
+/* Wide brand logo (your 16:9 image with the name in it). Keeps aspect ratio. */
+function WideLogo({ height = 28 }) {
+  const [err, setErr] = useState(false);
+  if (err) return <IconMark size={height} radius={Math.round(height * 0.3)} />;
+  return (
+    <img src="/logo.png" alt="Crica" onError={() => setErr(true)}
+      style={{ height, width: "auto", maxWidth: "100%", display: "block" }} />
+  );
+}
+
+/* Square mark (favicon / loading / notifications). Falls back to a crown. */
+function IconMark({ size = 56, radius = 14 }) {
   const [err, setErr] = useState(false);
   if (err) {
     return (
@@ -239,17 +250,22 @@ function Logo({ size = 28, radius = 9 }) {
     );
   }
   return (
-    <img src="/logo.png" alt="Crica" onError={() => setErr(true)}
+    <img src="/icon.png" alt="Crica" onError={() => setErr(true)}
       style={{ width: size, height: size, borderRadius: radius, objectFit: "cover", display: "block" }} />
   );
 }
 
-/* Fire a browser notification when permission has been granted */
-function notify(title, body) {
+/* Fire a browser notification. Uses the service worker in production, which is
+   the reliable path on a deployed HTTPS site, and falls back to the basic API. */
+async function notify(title, body) {
   try {
-    if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-      new Notification(title, { body, icon: "/logo.png" });
+    if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
+    const opts = { body, icon: "/icon.png", badge: "/icon.png" };
+    if ("serviceWorker" in navigator) {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg && reg.showNotification) { reg.showNotification(title, opts); return; }
     }
+    new Notification(title, opts);
   } catch (e) { /* ignore */ }
 }
 
@@ -322,7 +338,7 @@ function SetupScreen({ onComplete }) {
   return (
     <div className="auth-screen">
       <div className="auth-card">
-        <div className="brand-wrap"><Logo size={56} radius={17} /></div>
+        <div className="brand-wrap"><WideLogo height={46} /></div>
         <h1 className="auth-title">Set up Crica</h1>
         <p className="auth-sub">Two founders, one scoreboard. Create both accounts to begin.</p>
         <div className="setup-grid">
@@ -358,7 +374,7 @@ function LoginScreen({ users, onLogin }) {
   return (
     <div className="auth-screen">
       <div className="auth-card">
-        <div className="brand-wrap"><Logo size={56} radius={17} /></div>
+        <div className="brand-wrap"><WideLogo height={46} /></div>
         <h1 className="auth-title">Welcome back</h1>
         <p className="auth-sub">Pick your account to log in.</p>
         <div className="login-users">
@@ -382,9 +398,30 @@ function LoginScreen({ users, onLogin }) {
   );
 }
 
-/* ============================================================
-   Alert bar
-   ============================================================ */
+function DbErrorScreen({ kind }) {
+  const notConfigured = kind === "notconfigured";
+  return (
+    <div className="auth-screen">
+      <div className="auth-card">
+        <div className="brand-wrap"><IconMark size={56} radius={17} /></div>
+        <h1 className="auth-title">Cannot reach the database</h1>
+        {notConfigured ? (
+          <p className="auth-sub">Firebase is not set up in <b>src/firebase.js</b>, so there is nothing to sync to. Add the config and redeploy.</p>
+        ) : (
+          <p className="auth-sub">Crica connects to your Firebase Realtime Database to keep both of you in sync. It did not respond. This usually means the database has not been created yet, or its rules are blocking access.</p>
+        )}
+        {!notConfigured && (
+          <div className="db-help">
+            <div className="legend-line"><span>1. Realtime Database exists and is enabled</span></div>
+            <div className="legend-line"><span>2. Rules allow read and write</span></div>
+            <div className="legend-line"><span>3. The databaseURL in firebase.js is correct</span></div>
+          </div>
+        )}
+        <Btn className="full" onClick={() => window.location.reload()}>Try again</Btn>
+      </div>
+    </div>
+  );
+}
 function AlertBar({ alerts }) {
   if (!alerts.length) return null;
   return (
@@ -1136,9 +1173,10 @@ const DEFAULT_USERS = [
 function App() {
   const [users, setUsersState] = useState(null);
   const [setupDone, setSetupDone] = useState(false);
-  const [currentUserId, setCurrentUserId] = useState(null);
+  const [currentUserId, setCurrentUserId] = useState(() => { try { return localStorage.getItem("crica_user") || null; } catch (e) { return null; } });
   const [tab, setTab] = useState("dashboard");
   const [loading, setLoading] = useState(true);
+  const [dbError, setDbError] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
 
   const [habits, setHabitsState] = useState([]);
@@ -1151,33 +1189,32 @@ function App() {
   const [dailyPrompt, setDailyPrompt] = useState(false);
   const notifiedRef = useRef(new Set());
 
-  // Bootstrap: load accounts, seeding the two founders the first time
+  // Bootstrap: require Firebase. If it is missing or unreachable, fail loudly.
   useEffect(() => {
+    if (!firebaseConfigured) { setDbError("notconfigured"); setLoading(false); return; }
     let alive = true;
-    // Hard stop: never let a slow Firebase connection trap us on the loading screen
-    const hardStop = setTimeout(() => {
-      if (!alive) return;
-      setUsersState((u) => u || DEFAULT_USERS);
-      setSetupDone(true); setLoading(false);
-    }, 9000);
+    const hardStop = setTimeout(() => { if (alive) { setDbError("timeout"); setLoading(false); } }, 11000);
     (async () => {
-      let acc = null;
-      try { acc = await loadKey("accounts", null); } catch (e) { /* ignore */ }
-      if (!alive) return;
-      if (acc && acc.users && acc.users.length) {
+      try {
+        let acc = await loadKey("accounts", null);
+        if (!alive) return;
+        if (!acc || !acc.users || !acc.users.length) {
+          await saveKey("accounts", { users: DEFAULT_USERS, setupComplete: true });
+          acc = { users: DEFAULT_USERS };
+        }
         setUsersState(acc.users);
-      } else {
-        setUsersState(DEFAULT_USERS);
-        saveKey("accounts", { users: DEFAULT_USERS, setupComplete: true }); // not awaited, must not block boot
+        setSetupDone(true); setLoading(false);
+        clearTimeout(hardStop);
+      } catch (e) {
+        if (alive) { setDbError("error"); setLoading(false); clearTimeout(hardStop); }
       }
-      setSetupDone(true); setLoading(false);
-      clearTimeout(hardStop);
     })();
     return () => { alive = false; clearTimeout(hardStop); };
   }, []);
 
   // Real-time sync: the other founder's changes arrive live
   useEffect(() => {
+    if (!firebaseConfigured) return;
     const unsubs = [
       subscribeKey("accounts", (acc) => { if (acc && acc.users) { setUsersState(acc.users); setSetupDone(true); } }),
       subscribeKey("habits", (h) => setHabitsState(h || [])),
@@ -1202,7 +1239,7 @@ function App() {
       if (typeof Notification === "undefined") return;
       const p = await Notification.requestPermission();
       setNotifOn(p === "granted");
-      if (p === "granted") new Notification("Crica", { body: "Notifications are on. We will nudge you about what is due.", icon: "/logo.png" });
+      if (p === "granted") notify("Crica", "Notifications are on. We will nudge you about what is due.");
     } catch (e) { /* ignore */ }
   }, []);
 
@@ -1211,6 +1248,9 @@ function App() {
   const setTasks = (t) => { setTasksState(t); saveKey("tasks", t); };
   const setClients = (c) => { setClientsState(c); saveKey("clients", c); };
   const setFinance = (f) => { setFinanceState(f); saveKey("finance", f); };
+
+  const loginAs = (id) => { setCurrentUserId(id); try { localStorage.setItem("crica_user", id); } catch (e) { /* ignore */ } };
+  const logout = () => { setCurrentUserId(null); setShowSettings(false); try { localStorage.removeItem("crica_user"); } catch (e) { /* ignore */ } };
 
   const me = users?.find((u) => u.id === currentUserId);
 
@@ -1260,12 +1300,13 @@ function App() {
     });
   }, [alerts, notifOn, currentUserId]);
 
-  if (loading) return <><GlobalStyle /><div className="boot"><div className="boot-mark"><Logo size={56} radius={17} /></div></div></>;
-  if (!users) return <><GlobalStyle /><div className="boot"><div className="boot-mark"><Logo size={56} radius={17} /></div></div></>;
-  if (!currentUserId) return <><GlobalStyle /><LoginScreen users={users} onLogin={setCurrentUserId} /></>;
+  if (dbError) return <><GlobalStyle /><DbErrorScreen kind={dbError} /></>;
+  if (loading) return <><GlobalStyle /><div className="boot"><div className="boot-mark"><IconMark size={56} radius={14} /></div></div></>;
+  if (!users) return <><GlobalStyle /><div className="boot"><div className="boot-mark"><IconMark size={56} radius={14} /></div></div></>;
+  if (!currentUserId || !me) return <><GlobalStyle /><LoginScreen users={users} onLogin={loginAs} /></>;
 
   const renderTab = () => {
-    if (showSettings) return <SettingsTab users={users} me={me} setUsers={setUsers} onLogout={() => { setCurrentUserId(null); setShowSettings(false); }} dark={dark} setDark={setDark} notifOn={notifOn} enableNotifs={enableNotifs} />;
+    if (showSettings) return <SettingsTab users={users} me={me} setUsers={setUsers} onLogout={logout} dark={dark} setDark={setDark} notifOn={notifOn} enableNotifs={enableNotifs} />;
     switch (tab) {
       case "dashboard": return <Dashboard users={users} me={me} habits={habits} tasks={tasks} finance={finance} />;
       case "habits": return <HabitsTab users={users} me={me} habits={habits} setHabits={setHabits} />;
@@ -1281,7 +1322,7 @@ function App() {
       <GlobalStyle />
       <div className="app-root">
         <header className="app-header">
-          <div className="header-brand"><Logo size={28} radius={9} /><span>Crica</span></div>
+          <div className="header-brand"><WideLogo height={26} /></div>
           <nav className="top-nav">
             {TABS.map((tb) => (
               <button key={tb.id} className={"top-nav-item " + (!showSettings && tab === tb.id ? "on" : "")} onClick={() => { setTab(tb.id); setShowSettings(false); }}>
@@ -1344,6 +1385,8 @@ function GlobalStyle() {
     /* Logo */
     .logo-fallback { background: var(--blue); color: #fff; display: grid; place-items: center; }
     .brand-wrap { display: flex; justify-content: center; margin: 0 auto 16px; }
+    .db-help { text-align: left; background: var(--line-2); border-radius: 12px; padding: 12px 14px; margin: 4px 0 18px; }
+    .db-help .legend-line span:last-child { color: var(--ink-2); }
     /* Dark surface remaps for elements that were hardcoded white */
     html.crica-dark .field input, html.crica-dark .field textarea, html.crica-dark .field select,
     html.crica-dark .icon-pick, html.crica-dark .pill, html.crica-dark .login-user,
@@ -1451,7 +1494,7 @@ function GlobalStyle() {
     .ring-sub { font-size: 10px; color: var(--ink-3); font-weight: 500; }
 
     /* Modal */
-    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); backdrop-filter: blur(4px); z-index: 100; display: flex; align-items: flex-end; justify-content: center; padding: 0; animation: fade .2s; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); backdrop-filter: blur(4px); z-index: 100; display: flex; align-items: flex-end; justify-content: center; padding: 0; animation: fade .2s; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--ink); }
     @media (min-width: 600px) { .modal-overlay { align-items: center; padding: 20px; } }
     .modal { background: var(--surface); width: 100%; max-width: 460px; border-radius: 22px 22px 0 0; max-height: 90vh; overflow-y: auto; animation: sheet .3s cubic-bezier(.2,.8,.2,1); }
     @media (min-width: 600px) { .modal { border-radius: 22px; } }
