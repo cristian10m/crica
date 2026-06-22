@@ -1154,18 +1154,26 @@ function App() {
   // Bootstrap: load accounts, seeding the two founders the first time
   useEffect(() => {
     let alive = true;
-    (async () => {
-      const acc = await loadKey("accounts", null);
+    // Hard stop: never let a slow Firebase connection trap us on the loading screen
+    const hardStop = setTimeout(() => {
       if (!alive) return;
-      if (!acc || !acc.users || !acc.users.length) {
-        await saveKey("accounts", { users: DEFAULT_USERS, setupComplete: true });
-        setUsersState(DEFAULT_USERS); setSetupDone(true);
+      setUsersState((u) => u || DEFAULT_USERS);
+      setSetupDone(true); setLoading(false);
+    }, 9000);
+    (async () => {
+      let acc = null;
+      try { acc = await loadKey("accounts", null); } catch (e) { /* ignore */ }
+      if (!alive) return;
+      if (acc && acc.users && acc.users.length) {
+        setUsersState(acc.users);
       } else {
-        setUsersState(acc.users); setSetupDone(true);
+        setUsersState(DEFAULT_USERS);
+        saveKey("accounts", { users: DEFAULT_USERS, setupComplete: true }); // not awaited, must not block boot
       }
-      setLoading(false);
+      setSetupDone(true); setLoading(false);
+      clearTimeout(hardStop);
     })();
-    return () => { alive = false; };
+    return () => { alive = false; clearTimeout(hardStop); };
   }, []);
 
   // Real-time sync: the other founder's changes arrive live

@@ -13,6 +13,14 @@ const COLLECTION = "crica";
 const LS_PREFIX = "crica:";
 const mem = {};
 
+// Reject if a Firestore call stalls, so the app never hangs on a bad connection
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error("[Crica] timed out: " + label)), ms)),
+  ]);
+}
+
 function lsGet(key, fallback) {
   try {
     const raw = localStorage.getItem(LS_PREFIX + key);
@@ -29,7 +37,7 @@ function lsSet(key, data) {
 export async function loadKey(key, fallback) {
   if (!firebaseConfigured) return lsGet(key, fallback);
   try {
-    const snap = await getDoc(doc(db, COLLECTION, key));
+    const snap = await withTimeout(getDoc(doc(db, COLLECTION, key)), 8000, "loadKey:" + key);
     if (snap.exists()) {
       const d = snap.data();
       if (d && "value" in d) return d.value;
