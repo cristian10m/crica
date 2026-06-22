@@ -2,6 +2,11 @@
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", (e) => e.waitUntil(self.clients.claim()));
 
+// A pass-through fetch handler. It does not cache or change anything, it simply
+// lets the network handle every request. Its only job is to exist, because some
+// versions of Chrome only show "Install app" when the service worker has one.
+self.addEventListener("fetch", () => {});
+
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   event.waitUntil(
