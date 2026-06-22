@@ -119,3 +119,19 @@ Netlify works the same way if you prefer it. Firebase Hosting is also an option 
 - Blank screen: check the VS Code terminal for a red error and send it to me.
 - No syncing: open the browser console (F12) and look for a line starting with `[Crica]`. It will say if Firebase is not configured.
 - Logo not showing: confirm the file is named `logo.png` exactly and sits in the `public` folder.
+
+---
+
+## Where things live (project map)
+
+The app is split into small files so you can work on one thing at a time.
+
+- `src/App.jsx` is the shell: login state, routing, the top and bottom nav, and the daily popup.
+- `src/styles.jsx` holds all the CSS in one place.
+- `src/firebase.js` and `src/storage.js` handle the database and syncing.
+- `src/lib/` is the plumbing: `dates`, `format`, `constants`, `points` (scoring and the streak rule), `confetti`, `notify`, `invoices`, `hooks`.
+- `src/components/` is shared UI: `ui.jsx` (buttons, cards, modals, the logo), `DraggableList`, `AlertBar`.
+- `src/screens/` is `LoginScreen` and `DbErrorScreen`.
+- `src/tabs/` is one file per page: `Dashboard`, `HabitsTab`, `TasksTab`, `CompanyTab`, `DailyReport`, `SettingsTab`.
+
+So if you want to change the Company page, open `src/tabs/CompanyTab.jsx`. To tweak colors or spacing, open `src/styles.jsx`. To change a default, open `src/lib/constants.js`.
