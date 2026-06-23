@@ -25,8 +25,9 @@ export function FocusFab({ session, onOpen }) {
   );
 }
 
-export function FocusOverlay({ open, onClose, engine }) {
+export function FocusOverlay({ open, onClose, engine, onStart }) {
   const { session, start, pause, resume, end, dismiss } = engine;
+  const begin = onStart || start;
   const [custom, setCustom] = useState(60);
   const pts = session ? earnedPoints(session.focusedMs) : 0;
   const prevPts = useRef(pts);
@@ -65,7 +66,7 @@ export function FocusOverlay({ open, onClose, engine }) {
           <p className="focus-sub">Earn {POINTS_PER_HOUR} points for every hour of focused work. The timer only counts while this stays open and in front of you.</p>
           <div className="focus-presets">
             {FOCUS_PRESETS.map((m) => (
-              <button key={m} className="focus-preset" onClick={() => start(m)}>
+              <button key={m} className="focus-preset" onClick={() => begin(m)}>
                 <b>{m}</b><span>min</span><i>+{Math.floor((m / 60) * POINTS_PER_HOUR)} pts</i>
               </button>
             ))}
@@ -75,7 +76,7 @@ export function FocusOverlay({ open, onClose, engine }) {
             <input type="number" min="1" max={FOCUS_MAX_MIN} value={custom}
               onChange={(e) => setCustom(Math.max(1, Math.min(FOCUS_MAX_MIN, parseInt(e.target.value) || 1)))} />
             <span>min</span>
-            <Btn variant="primary" onClick={() => start(custom)}><Play size={15} /> Start</Btn>
+            <Btn variant="primary" onClick={() => begin(custom)}><Play size={15} /> Start</Btn>
           </div>
         </div>
       )}

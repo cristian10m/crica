@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Check, Trash2, GripVertical, CheckSquare, Users, Building2, Clock, Filter, Hand, Inbox, Play, Square, Timer } from "lucide-react";
+import { Plus, Check, Trash2, GripVertical, CheckSquare, Users, Building2, Clock, Filter, Hand, Inbox, Play, Square, Timer, Lock } from "lucide-react";
 import { Card, Btn, IconBtn, Modal, Field, Segmented, Avatar, PageHead } from "../components/ui";
 import { DraggableList } from "../components/DraggableList";
 import { todayStr, dateDiff, prettyDate } from "../lib/dates";
@@ -15,7 +15,7 @@ const fmtElapsed = (ms) => {
   return `${ss}s`;
 };
 
-export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard, setBoard }) {
+export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard, setBoard, onWorkStart }) {
   const board = propBoard || "pool"; // unclaimed tasks are the default view
   const [filter, setFilter] = useState("active");
   const [taskModal, setTaskModal] = useState(null); // null | "new" | task
@@ -68,6 +68,7 @@ export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard
       if (t.working && t.working[me.id] != null) { const w = { ...t.working }; delete w[me.id]; return { ...t, working: w }; }
       return t;
     }));
+    if (onWorkStart) onWorkStart();
   };
   const stopWorking = (task) => {
     setTasks(tasks.map((t) => {
@@ -143,7 +144,7 @@ export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard
 
           {visible.length === 0 && <Card className="empty"><CheckSquare size={26} /><div>Nothing here. {filter === "done" ? "No tasks completed yet." : "Add a task to get going."}</div></Card>}
 
-          <DraggableList items={visible} getKey={(t) => t.id} onReorder={reorder} renderItem={(t, ctx) => {
+          <DraggableList items={visible.filter((t) => !(t.private && t.creatorId !== me.id))} getKey={(t) => t.id} onReorder={reorder} renderItem={(t, ctx) => {
             const done = !!(t.completed || {})[board];
             const imp = TASK_IMPORTANCE[t.importance] || TASK_IMPORTANCE.medium;
             const client = clients.find((c) => c.id === t.clientId);
@@ -161,6 +162,7 @@ export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard
                   <div className="task-title">{t.title}</div>
                   <div className="task-meta">
                     <span className="chip" style={{ color: imp.color, borderColor: imp.color + "55" }}>{imp.label} +{imp.points}</span>
+                    {t.private && <span className="chip private-chip"><Lock size={11} /> Private</span>}
                     {client && <span className="chip"><Building2 size={11} /> {client.name}</span>}
                     {both && <span className="chip"><Users size={11} /> Both</span>}
                     {t.dueDate && <span className={"chip " + (dueSoon ? "warn" : "")}><Clock size={11} /> {prettyDate(t.dueDate)}</span>}
@@ -182,6 +184,19 @@ export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard
               </Card>
             );
           }} />
+
+          {visible.filter((t) => t.private && t.creatorId !== me.id).map((t) => {
+            const done = !!(t.completed || {})[board];
+            return (
+              <Card key={t.id} className="task-card censored">
+                <span className="priv-lock"><Lock size={16} /></span>
+                <div className="censored-name"><span className="blurred">Private task</span></div>
+                <div className="censored-stats">
+                  <span className={"dot " + (done ? "dot-on" : "")} style={done && boardUser ? { background: boardUser.color } : {}} title={done ? "Done" : "Not done"} />
+                </div>
+              </Card>
+            );
+          })}
         </>
       )}
 
@@ -215,11 +230,13 @@ function TaskModal({ open, task, users, me, clients, onClose, onSave, onDelete }
   const [clientId, setClientId] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [importance, setImportance] = useState("medium");
+  const [priv, setPriv] = useState(false);
   useEffect(() => {
     if (open) {
       setTitle(task?.title || ""); setNotes(task?.notes || "");
       setAssignees(task?.assignees || [me.id]); setClientId(task?.clientId || "");
       setDueDate(task?.dueDate || ""); setImportance(task?.importance || "medium");
+      setPriv(!!task?.private);
     }
   }, [open, task]);
   const toggleAssignee = (id) => setAssignees((a) => a.includes(id) ? (a.length > 1 ? a.filter((x) => x !== id) : a) : [...a, id]);
@@ -227,17 +244,25 @@ function TaskModal({ open, task, users, me, clients, onClose, onSave, onDelete }
     <Modal open={open} onClose={onClose} title={task ? "Edit task" : "New task"}>
       <Field label="Task"><input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What needs doing?" autoFocus /></Field>
       <Field label="Notes (optional)"><textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} placeholder="Details, links, context" /></Field>
-      <span className="field-label">Assign to</span>
-      <div className="seg-pills">
-        {users.map((u) => (
-          <button key={u.id} className={"pill " + (assignees.includes(u.id) ? "pill-on" : "")} onClick={() => toggleAssignee(u.id)}>
-            <Avatar user={u} size={18} /> {u.name}
-          </button>
-        ))}
-        <button className={"pill " + (assignees.length === users.length ? "pill-on" : "")} onClick={() => setAssignees(users.map((u) => u.id))}>
-          <Users size={14} /> Both
-        </button>
+      <div className="toggle-row">
+        <span><Lock size={14} style={{ verticalAlign: "-2px", marginRight: 6 }} />Private, only you can see it</span>
+        <button className={"toggle " + (priv ? "toggle-on" : "")} onClick={() => setPriv(!priv)} aria-label="Toggle private"><span className="toggle-knob" /></button>
       </div>
+      {!priv && (
+        <>
+          <span className="field-label">Assign to</span>
+          <div className="seg-pills">
+            {users.map((u) => (
+              <button key={u.id} className={"pill " + (assignees.includes(u.id) ? "pill-on" : "")} onClick={() => toggleAssignee(u.id)}>
+                <Avatar user={u} size={18} /> {u.name}
+              </button>
+            ))}
+            <button className={"pill " + (assignees.length === users.length ? "pill-on" : "")} onClick={() => setAssignees(users.map((u) => u.id))}>
+              <Users size={14} /> Both
+            </button>
+          </div>
+        </>
+      )}
       <div className="grid-2">
         <Field label="Client (optional)">
           <select value={clientId} onChange={(e) => setClientId(e.target.value)}>
@@ -250,7 +275,7 @@ function TaskModal({ open, task, users, me, clients, onClose, onSave, onDelete }
       <ImportancePills importance={importance} setImportance={setImportance} />
       <div className="modal-actions">
         {task && <Btn variant="ghost-danger" onClick={() => onDelete(task.id)}><Trash2 size={16} /> Delete</Btn>}
-        <Btn onClick={() => title.trim() && onSave({ ...(task || {}), title: title.trim(), notes, assignees, clientId: clientId || null, dueDate: dueDate || null, importance })}>Save</Btn>
+        <Btn onClick={() => title.trim() && onSave({ ...(task || {}), title: title.trim(), notes, assignees: priv ? [me.id] : assignees, clientId: clientId || null, dueDate: dueDate || null, importance, private: priv })}>Save</Btn>
       </div>
     </Modal>
   );

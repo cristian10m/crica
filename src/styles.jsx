@@ -89,7 +89,7 @@ export function GlobalStyle() {
 
     /* Cards */
     .card { background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); }
-    .card-title { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 12px; }
+    .card-title { display: flex; align-items: center; gap: 7px; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 12px; }
     .empty { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; color: var(--ink-3); padding: 34px 18px; }
     .empty svg { color: var(--blue); opacity: .65; }
 
@@ -220,6 +220,49 @@ export function GlobalStyle() {
     .profile-h2h svg { color: var(--blue); }
     .settings-divider { margin: 22px 2px 12px; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); }
 
+    /* Schedule / availability */
+    .sched-intro { display: flex; align-items: flex-start; gap: 7px; font-size: 13px; color: var(--ink-2); line-height: 1.45; margin: 4px 2px 14px; }
+    .sched-intro svg { color: #34C759; flex-shrink: 0; margin-top: 2px; }
+    .sched-week-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .sched-week-label { font-weight: 700; font-size: 15px; letter-spacing: -0.01em; }
+    .sched-axis { display: flex; gap: 8px; margin-bottom: 4px; }
+    .sched-axis-spacer { width: 22px; flex: none; }
+    .sched-axis-track { position: relative; flex: 1; height: 14px; }
+    .sched-axis-track span { position: absolute; top: 0; font-size: 10px; color: var(--ink-3); transform: translateX(-50%); white-space: nowrap; }
+    .sched-axis-track span:first-child { transform: none; }
+    .sched-axis-track span:last-child { transform: translateX(-100%); }
+    .sched-day { padding: 11px 13px; margin-bottom: 8px; }
+    .sched-today { border-color: var(--blue); }
+    .sched-day-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 9px; }
+    .sched-day-name { font-weight: 700; font-size: 13.5px; flex-shrink: 0; }
+    .sched-free-text { font-size: 12.5px; font-weight: 600; text-align: right; line-height: 1.35; }
+    .sched-free-text.has-free { color: #2ba84a; }
+    html.crica-dark .sched-free-text.has-free { color: #45d869; }
+    .sched-free-text.no-free { color: var(--ink-3); font-weight: 500; }
+    .sched-lanes { display: flex; flex-direction: column; gap: 5px; }
+    .sched-lane { display: flex; align-items: center; gap: 8px; }
+    .sched-lane-name { width: 22px; flex: none; display: grid; place-items: center; color: var(--ink-3); }
+    .sched-free-ic { color: #34C759; }
+    .sched-track { position: relative; flex: 1; height: 14px; background: var(--line-2); border-radius: 5px; overflow: hidden; }
+    .sched-busy { position: absolute; top: 0; bottom: 0; border-radius: 4px; opacity: 0.92; }
+    .sched-free-track { background: var(--line-2); }
+    .sched-free { position: absolute; top: 0; bottom: 0; background: #34C759; border-radius: 4px; }
+    .sched-allfree { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 9px; color: var(--ink-3); letter-spacing: 0.02em; }
+
+    .rota-row { display: flex; flex-direction: column; gap: 9px; padding: 11px 0; border-bottom: 1px solid var(--line-2); }
+    .rota-row:last-child { border-bottom: none; padding-bottom: 0; }
+    .rota-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; background: none; border: none; padding: 0; cursor: pointer; }
+    .rota-day { font-weight: 600; font-size: 14.5px; color: var(--ink); }
+    .rota-status { font-size: 12px; font-weight: 700; color: var(--blue); padding: 3px 10px; border-radius: 999px; background: rgba(0,113,227,0.1); }
+    .rota-status.off { color: var(--ink-3); background: var(--line-2); }
+    .rota-times { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); }
+    .rota-times input { border: 1.5px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 9px; padding: 8px 10px; font-size: 14px; font-weight: 600; }
+    .rota-clone { margin-left: auto; color: var(--blue); }
+    .exc-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--line-2); }
+    .exc-row:last-of-type { border-bottom: none; }
+    .exc-date { font-weight: 600; font-size: 14px; }
+    .exc-detail { font-size: 12.5px; color: var(--ink-3); margin-top: 2px; }
+
     /* Habits */
     .habit-card { display: flex; align-items: center; gap: 12px; padding: 13px 14px; transition: box-shadow .2s, transform .2s; }
     .habit-done { background: linear-gradient(0deg, rgba(0,113,227,0.04), rgba(0,113,227,0.04)), #fff; }
@@ -246,6 +289,8 @@ export function GlobalStyle() {
     .blurred { filter: blur(6px); user-select: none; font-weight: 600; font-size: 15px; color: var(--ink-2); }
     .censored-stats { display: flex; align-items: center; gap: 8px; }
     .dot { width: 11px; height: 11px; border-radius: 50%; background: rgba(0,0,0,0.12); }
+    .private-chip { color: var(--ink-3); }
+    .priv-lock { display: grid; place-items: center; color: var(--ink-3); width: 24px; flex: none; }
     .icon-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-bottom: 14px; }
     .icon-pick { aspect-ratio: 1; border: 1.5px solid var(--line); background: #fff; border-radius: 12px; font-size: 20px; cursor: pointer; transition: all .15s; }
     .icon-pick.on { border-color: var(--blue); background: rgba(0,113,227,0.08); }

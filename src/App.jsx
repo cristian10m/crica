@@ -7,6 +7,8 @@ import { GlobalStyle } from "./styles";
 import { Avatar, Modal, Btn, WideLogo, IconMark } from "./components/ui";
 import { AlertBar } from "./components/AlertBar";
 import { FocusFab, FocusOverlay } from "./components/Focus";
+import { usePipWindow, PipMini } from "./components/PipMini";
+import { createPortal } from "react-dom";
 import { LoginScreen } from "./screens/LoginScreen";
 import { DbErrorScreen } from "./screens/DbErrorScreen";
 import { Dashboard } from "./tabs/Dashboard";
@@ -47,6 +49,7 @@ export default function App() {
   const [clients, setClientsState] = useState([]);
   const [finance, setFinanceState] = useState(DEFAULT_FINANCE);
   const [focus, setFocusState] = useState([]);
+  const [schedules, setSchedulesState] = useState({});
 
   const [dark, setDark] = useState(() => { try { return localStorage.getItem("crica_theme") === "dark"; } catch (e) { return false; } });
   const [notifOn, setNotifOn] = useState(() => typeof Notification !== "undefined" && Notification.permission === "granted");
@@ -61,6 +64,14 @@ export default function App() {
   }, [currentUserId]);
 
   const focusEngine = useFocusEngine({ onBank: bankFocus });
+  const pip = usePipWindow();
+  const stopMyWork = () => setTasksState((prev) => {
+    const next = (prev || []).map((t) => {
+      if (!(t.working && t.working[currentUserId] != null)) return t;
+      const w = { ...t.working }; delete w[currentUserId]; return { ...t, working: w };
+    });
+    saveKey("tasks", next); return next;
+  });
 
   // Bootstrap: require Firebase. If it is missing or unreachable, fail loudly.
   useEffect(() => {
@@ -95,6 +106,7 @@ export default function App() {
       subscribeKey("clients", (c) => setClientsState(c || [])),
       subscribeKey("finance", (f) => { if (f) setFinanceState(f); }),
       subscribeKey("focus", (f) => setFocusState(f || [])),
+      subscribeKey("schedules", (s) => setSchedulesState(s || {})),
     ];
     return () => unsubs.forEach((u) => { try { u && u(); } catch (e) { /* ignore */ } });
   }, []);
@@ -127,6 +139,7 @@ export default function App() {
   const setTasks = (t) => { setTasksState(t); saveKey("tasks", t); };
   const setClients = (c) => { setClientsState(c); saveKey("clients", c); };
   const setFinance = (f) => { setFinanceState(f); saveKey("finance", f); };
+  const setSchedules = (s) => { setSchedulesState(s); saveKey("schedules", s); };
 
   const loginAs = (id) => { setCurrentUserId(id); try { localStorage.setItem("crica_user", id); } catch (e) { /* ignore */ } };
   const logout = () => { setCurrentUserId(null); setShowSettings(false); try { localStorage.removeItem("crica_user"); } catch (e) { /* ignore */ } };
@@ -193,6 +206,14 @@ export default function App() {
     scheduleReminders({ tasks, clients, me });
   }, [tasks, clients, me, notifOn]);
 
+  // Mini floating window (desktop): live while focusing or working a task
+  const myWorkingTask = currentUserId ? tasks.find((t) => t.working && t.working[currentUserId] != null) : null;
+  const focusActive = focusEngine.session && focusEngine.session.phase !== "done";
+  const pipShouldShow = !!(focusActive || myWorkingTask);
+  useEffect(() => {
+    if (pip.pipWindow && !pipShouldShow) pip.closePip();
+  }, [pipShouldShow, pip.pipWindow]);
+
   if (dbError) return <><GlobalStyle /><DbErrorScreen kind={dbError} /></>;
   if (loading || !users) return <><GlobalStyle /><div className="boot"><div className="boot-mark"><IconMark size={56} radius={14} /></div></div></>;
   if (!currentUserId || !me) return <><GlobalStyle /><LoginScreen users={users} onLogin={loginAs} /></>;
@@ -202,9 +223,9 @@ export default function App() {
     switch (tab) {
       case "dashboard": return <Dashboard users={users} me={me} habits={habits} tasks={tasks} finance={finance} focus={focus} />;
       case "habits": return <HabitsTab users={users} me={me} habits={habits} setHabits={setHabits} />;
-      case "tasks": return <TasksTab users={users} me={me} tasks={tasks} setTasks={setTasks} clients={clients} board={tasksBoard} setBoard={setTasksBoard} />;
+      case "tasks": return <TasksTab users={users} me={me} tasks={tasks} setTasks={setTasks} clients={clients} board={tasksBoard} setBoard={setTasksBoard} onWorkStart={() => pip.openPip()} />;
       case "vault": return <CompanyTab finance={finance} setFinance={setFinance} clients={clients} setClients={setClients} />;
-      case "report": return <DailyReport users={users} habits={habits} tasks={tasks} focus={focus} />;
+      case "report": return <DailyReport users={users} me={me} habits={habits} tasks={tasks} focus={focus} schedules={schedules} setSchedules={setSchedules} />;
       default: return null;
     }
   };
@@ -243,8 +264,17 @@ export default function App() {
       </div>
 
       <FocusFab session={focusEngine.session} onOpen={() => setFocusOpen(true)} />
-      <FocusOverlay open={focusOpen} engine={focusEngine}
+      <FocusOverlay open={focusOpen} engine={focusEngine} onStart={(m) => { focusEngine.start(m); pip.openPip(); }}
         onClose={() => { setFocusOpen(false); if (focusEngine.session?.phase === "done") focusEngine.dismiss(); }} />
+
+      {pip.pipWindow && pipShouldShow && createPortal(
+        <PipMini
+          focus={focusEngine.session}
+          workingTitle={myWorkingTask ? myWorkingTask.title : ""}
+          workingStart={myWorkingTask ? myWorkingTask.working[currentUserId] : null}
+          onPause={focusEngine.pause} onResume={focusEngine.resume} onEnd={focusEngine.end}
+          onStopWork={stopMyWork}
+        />, pip.pipWindow.document.body)}
 
       <Modal open={dailyPrompt} onClose={() => dismissDaily(false)} title={`Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, ${me?.name || ""}`}>
         <p style={{ margin: "0 0 16px", color: "var(--ink-2)", fontSize: 15, lineHeight: 1.5 }}>

@@ -3,8 +3,9 @@ import { ChevronLeft, ChevronRight, CalendarDays, Crown, CheckSquare, Repeat, Ch
 import { Card, IconBtn, Avatar, PageHead } from "../components/ui";
 import { pointsOnDay, focusSecondsInRange } from "../lib/points";
 import { addDays, todayStr, dateDiff, prettyDate } from "../lib/dates";
+import { Schedule } from "./Schedule";
 
-export function DailyReport({ users, habits, tasks, focus = [] }) {
+export function DailyReport({ users, me, habits, tasks, focus = [], schedules = {}, setSchedules }) {
   const [day, setDay] = useState(addDays(todayStr(), -1));
   const isYesterday = day === addDays(todayStr(), -1);
   const canForward = dateDiff(todayStr(), day) > 0;
@@ -50,6 +51,9 @@ export function DailyReport({ users, habits, tasks, focus = [] }) {
           </Card>
         ))}
       </div>
+
+      <div className="settings-divider">Availability</div>
+      <Schedule users={users} me={me} schedules={schedules} setSchedules={setSchedules} />
     </div>
   );
 }
