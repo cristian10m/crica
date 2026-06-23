@@ -14,6 +14,7 @@ const fmtElapsed = (ms) => {
   if (m > 0) return `${m}m ${ss}s`;
   return `${ss}s`;
 };
+const isPriv = (t) => !!(t.isPrivate || t.private);
 
 export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard, setBoard, onWorkStart }) {
   const board = propBoard || "pool"; // unclaimed tasks are the default view
@@ -144,7 +145,7 @@ export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard
 
           {visible.length === 0 && <Card className="empty"><CheckSquare size={26} /><div>Nothing here. {filter === "done" ? "No tasks completed yet." : "Add a task to get going."}</div></Card>}
 
-          <DraggableList items={visible.filter((t) => !(t.private && t.creatorId !== me.id))} getKey={(t) => t.id} onReorder={reorder} renderItem={(t, ctx) => {
+          <DraggableList items={visible.filter((t) => !(isPriv(t) && t.creatorId !== me.id))} getKey={(t) => t.id} onReorder={reorder} renderItem={(t, ctx) => {
             const done = !!(t.completed || {})[board];
             const imp = TASK_IMPORTANCE[t.importance] || TASK_IMPORTANCE.medium;
             const client = clients.find((c) => c.id === t.clientId);
@@ -161,8 +162,8 @@ export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard
                 <div className="task-main" onClick={() => setTaskModal(t)}>
                   <div className="task-title">{t.title}</div>
                   <div className="task-meta">
-                    <span className="chip" style={{ color: imp.color, borderColor: imp.color + "55" }}>{imp.label} +{imp.points}</span>
-                    {t.private && <span className="chip private-chip"><Lock size={11} /> Private</span>}
+                    <span className="chip" style={{ color: imp.color, borderColor: imp.color + "55" }}>{imp.label}{isPriv(t) ? "" : ` +${imp.points}`}</span>
+                    {isPriv(t) && <span className="chip private-chip"><Lock size={11} /> Private</span>}
                     {client && <span className="chip"><Building2 size={11} /> {client.name}</span>}
                     {both && <span className="chip"><Users size={11} /> Both</span>}
                     {t.dueDate && <span className={"chip " + (dueSoon ? "warn" : "")}><Clock size={11} /> {prettyDate(t.dueDate)}</span>}
@@ -185,7 +186,7 @@ export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard
             );
           }} />
 
-          {visible.filter((t) => t.private && t.creatorId !== me.id).map((t) => {
+          {visible.filter((t) => isPriv(t) && t.creatorId !== me.id).map((t) => {
             const done = !!(t.completed || {})[board];
             return (
               <Card key={t.id} className="task-card censored">
@@ -236,7 +237,7 @@ function TaskModal({ open, task, users, me, clients, onClose, onSave, onDelete }
       setTitle(task?.title || ""); setNotes(task?.notes || "");
       setAssignees(task?.assignees || [me.id]); setClientId(task?.clientId || "");
       setDueDate(task?.dueDate || ""); setImportance(task?.importance || "medium");
-      setPriv(!!task?.private);
+      setPriv(!!(task?.isPrivate || task?.private));
     }
   }, [open, task]);
   const toggleAssignee = (id) => setAssignees((a) => a.includes(id) ? (a.length > 1 ? a.filter((x) => x !== id) : a) : [...a, id]);
@@ -275,7 +276,7 @@ function TaskModal({ open, task, users, me, clients, onClose, onSave, onDelete }
       <ImportancePills importance={importance} setImportance={setImportance} />
       <div className="modal-actions">
         {task && <Btn variant="ghost-danger" onClick={() => onDelete(task.id)}><Trash2 size={16} /> Delete</Btn>}
-        <Btn onClick={() => title.trim() && onSave({ ...(task || {}), title: title.trim(), notes, assignees: priv ? [me.id] : assignees, clientId: clientId || null, dueDate: dueDate || null, importance, private: priv })}>Save</Btn>
+        <Btn onClick={() => title.trim() && onSave({ ...(task || {}), title: title.trim(), notes, assignees: priv ? [me.id] : assignees, clientId: clientId || null, dueDate: dueDate || null, importance, isPrivate: priv })}>Save</Btn>
       </div>
     </Modal>
   );

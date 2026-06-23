@@ -96,6 +96,7 @@ export function lastDone(habit) {
 
 export function habitPoints(h) { return HABIT_POINTS; }
 export function taskPoints(t) {
+  if (t.isPrivate || t.private) return 0; // personal tasks do not score
   if (typeof t.points === "number") return t.points; // bounty tasks carry their own value
   return (TASK_IMPORTANCE[t.importance] || TASK_IMPORTANCE.medium).points;
 }
