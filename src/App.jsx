@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { loadKey, saveKey, subscribeKey } from "./storage";
 import { firebaseConfigured } from "./firebase";
-import { Home, Repeat, CheckSquare, PiggyBank, CalendarDays, Settings, Clock, Receipt } from "lucide-react";
+import { Home, Repeat, CheckSquare, PiggyBank, CalendarDays, Clock, Receipt, User } from "lucide-react";
 
 import { GlobalStyle } from "./styles";
 import { Avatar, Modal, Btn, WideLogo, IconMark } from "./components/ui";
@@ -14,7 +14,7 @@ import { HabitsTab } from "./tabs/HabitsTab";
 import { TasksTab } from "./tabs/TasksTab";
 import { CompanyTab } from "./tabs/CompanyTab";
 import { DailyReport } from "./tabs/DailyReport";
-import { SettingsTab } from "./tabs/SettingsTab";
+import { ProfileTab } from "./tabs/ProfileTab";
 
 import { todayStr, dateDiff } from "./lib/dates";
 import { nextInvoiceDate } from "./lib/invoices";
@@ -198,7 +198,7 @@ export default function App() {
   if (!currentUserId || !me) return <><GlobalStyle /><LoginScreen users={users} onLogin={loginAs} /></>;
 
   const renderTab = () => {
-    if (showSettings) return <SettingsTab users={users} me={me} setUsers={setUsers} onLogout={logout} dark={dark} setDark={setDark} notifOn={notifOn} enableNotifs={enableNotifs} />;
+    if (showSettings) return <ProfileTab users={users} me={me} setUsers={setUsers} onLogout={logout} dark={dark} setDark={setDark} notifOn={notifOn} enableNotifs={enableNotifs} habits={habits} tasks={tasks} focus={focus} />;
     switch (tab) {
       case "dashboard": return <Dashboard users={users} me={me} habits={habits} tasks={tasks} finance={finance} focus={focus} />;
       case "habits": return <HabitsTab users={users} me={me} habits={habits} setHabits={setHabits} />;
@@ -237,7 +237,7 @@ export default function App() {
             </button>
           ))}
           <button className={"bottom-nav-item " + (showSettings ? "on" : "")} onClick={() => setShowSettings(true)}>
-            <Settings size={20} /><span>You</span>
+            <User size={20} /><span>Profile</span>
           </button>
         </nav>
       </div>

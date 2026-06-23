@@ -46,21 +46,23 @@ export function GlobalStyle() {
     /* Header */
     .topbar { position: sticky; top: 0; z-index: 40; }
     .app-header {
-      position: static; z-index: 40; display: flex; align-items: center; justify-content: space-between;
+      position: relative; z-index: 40; display: flex; align-items: center; justify-content: space-between;
       gap: 12px; padding: 12px 18px; background: var(--header-bg); backdrop-filter: saturate(180%) blur(20px);
       border-bottom: 1px solid var(--line);
     }
-    .header-brand { display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 17px; letter-spacing: -0.02em; background: none; border: none; padding: 0; cursor: pointer; }
+    .header-brand { position: absolute; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 9px; font-weight: 700; font-size: 17px; letter-spacing: -0.02em; background: none; border: none; padding: 0; cursor: pointer; }
     .brand-dot { width: 28px; height: 28px; border-radius: 9px; background: var(--blue); color: #fff; display: grid; place-items: center; }
     .top-nav { display: none; gap: 4px; }
     .top-nav-item { display: flex; align-items: center; gap: 6px; padding: 8px 14px; border: none; background: transparent; color: var(--ink-2);
       border-radius: 11px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all .18s; }
     .top-nav-item:hover { background: rgba(0,0,0,0.04); color: var(--ink); }
     .top-nav-item.on { background: var(--blue); color: #fff; }
-    .header-me { border: none; background: transparent; cursor: pointer; padding: 0; border-radius: 50%; }
+    .header-me { border: none; background: transparent; cursor: pointer; padding: 0; border-radius: 50%; margin-left: auto; }
 
     @media (min-width: 820px) {
       .top-nav { display: flex; }
+      .header-brand { position: static; transform: none; }
+      .header-me { margin-left: 0; }
       .bottom-nav { display: none !important; }
       .app-root { padding-bottom: 0; }
       .app-main { max-width: 980px; margin: 0 auto; }
@@ -201,6 +203,22 @@ export function GlobalStyle() {
     .badge-row { display: flex; flex-wrap: wrap; gap: 8px; }
     .badge { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; background: rgba(0,113,227,0.08); color: var(--blue); border-radius: 11px; font-size: 12.5px; font-weight: 600; }
     .badge-ic { display: grid; place-items: center; }
+
+    /* Profile */
+    .profile-switch { display: flex; gap: 8px; margin-bottom: 14px; }
+    .profile-switch-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px; border-radius: 13px;
+      border: 1.5px solid var(--line); background: var(--surface); color: var(--ink-2); font-weight: 600; font-size: 14px; cursor: pointer; transition: all .15s; }
+    .profile-switch-btn.on { border-color: var(--blue); color: var(--ink); background: rgba(0,113,227,0.06); }
+    .profile-hero { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 22px 18px; }
+    .profile-avatar-wrap { position: relative; width: 92px; height: 92px; margin-bottom: 12px; }
+    .profile-cam { position: absolute; right: -2px; bottom: -2px; width: 32px; height: 32px; border-radius: 50%; border: 3px solid var(--surface);
+      background: var(--blue); color: #fff; display: grid; place-items: center; cursor: pointer; }
+    .profile-name { font-size: 24px; font-weight: 800; letter-spacing: -0.03em; }
+    .profile-rank { display: inline-block; margin-top: 7px; padding: 4px 12px; border: 1.5px solid; border-radius: 999px; font-size: 12.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+    .profile-bio { margin-top: 10px; font-size: 14px; color: var(--ink-2); max-width: 340px; line-height: 1.45; }
+    .profile-h2h { display: inline-flex; align-items: center; gap: 6px; margin-top: 14px; padding: 7px 13px; border-radius: 11px; background: rgba(0,113,227,0.08); color: var(--blue); font-size: 13px; font-weight: 600; }
+    .profile-h2h svg { color: var(--blue); }
+    .settings-divider { margin: 22px 2px 12px; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); }
 
     /* Habits */
     .habit-card { display: flex; align-items: center; gap: 12px; padding: 13px 14px; transition: box-shadow .2s, transform .2s; }

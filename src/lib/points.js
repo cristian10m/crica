@@ -115,3 +115,56 @@ export function totalPoints(userId, habits, tasks, focus = []) { return pointsIn
 export function focusSecondsInRange(userId, from, to, focus = []) {
   return (focus || []).reduce((s, f) => (f.userId === userId && f.date >= from && f.date <= to ? s + (f.seconds || 0) : s), 0);
 }
+
+// Longest streak a habit ever reached (daily: consecutive days; weekly: consecutive kept weeks).
+export function bestStreakEver(habit) {
+  const comp = habit.completions || {};
+  const days = Object.keys(comp).filter((d) => comp[d]).sort();
+  if (!days.length) return 0;
+  if (habit.freqType === "weekly") {
+    const target = Math.max(1, Math.min(7, habit.perWeek || 3));
+    const counts = {};
+    days.forEach((d) => { const ws = startOfWeek(d); counts[ws] = (counts[ws] || 0) + 1; });
+    const metWeeks = Object.keys(counts).filter((ws) => counts[ws] >= target).sort();
+    let best = 0, run = 0, prev = null;
+    metWeeks.forEach((ws) => { run = (prev && dateDiff(ws, prev) === 7) ? run + 1 : 1; prev = ws; if (run > best) best = run; });
+    return best;
+  }
+  let best = 0, run = 0, prev = null;
+  days.forEach((d) => { run = (prev && dateDiff(d, prev) === 1) ? run + 1 : 1; prev = d; if (run > best) best = run; });
+  return best;
+}
+
+// A playful rank derived from total points.
+export function rankFor(points) {
+  if (points >= 5000) return { title: "Legend", color: "#AF52DE" };
+  if (points >= 2000) return { title: "Machine", color: "#0071E3" };
+  if (points >= 750) return { title: "Grinder", color: "#34C759" };
+  if (points >= 200) return { title: "Regular", color: "#FF9500" };
+  return { title: "Rookie", color: "#8e8e93" };
+}
+
+// All-time profile numbers for one person, including the head to head record vs the other.
+export function profileStats(user, other, habits, tasks, focus) {
+  const points = totalPoints(user.id, habits, tasks, focus);
+  const tasksDone = tasks.filter((t) => (t.completed || {})[user.id]).length;
+  const myHabits = habits.filter((h) => h.ownerId === user.id);
+  const habitsKept = myHabits.reduce((s, h) => s + Object.values(h.completions || {}).filter(Boolean).length, 0);
+  const bestStreak = myHabits.length ? Math.max(...myHabits.map(bestStreakEver)) : 0;
+  const focusSec = focusSecondsInRange(user.id, "0000-00-00", "9999-99-99", focus);
+
+  const dates = new Set();
+  habits.forEach((h) => Object.keys(h.completions || {}).forEach((d) => { if (h.completions[d]) dates.add(d); }));
+  tasks.forEach((t) => Object.values(t.completed || {}).forEach((d) => { if (d) dates.add(d); }));
+  (focus || []).forEach((f) => { if (f.date) dates.add(f.date); });
+
+  let daysWon = 0, daysLost = 0;
+  dates.forEach((d) => {
+    const mine = pointsOnDay(user.id, d, habits, tasks, focus);
+    const theirs = other ? pointsOnDay(other.id, d, habits, tasks, focus) : 0;
+    if (mine > theirs && mine > 0) daysWon++;
+    else if (other && theirs > mine && theirs > 0) daysLost++;
+  });
+
+  return { points, tasksDone, habitsKept, bestStreak, focusSec, daysWon, daysLost, rank: rankFor(points) };
+}

@@ -56,6 +56,9 @@ export function Ring({ value, size = 64, stroke = 7, color = BLUE, label, sub })
 }
 export function Avatar({ user, size = 34 }) {
   if (!user) return null;
+  if (user.avatar) {
+    return <img className="avatar" src={user.avatar} alt={user.name} style={{ width: size, height: size, objectFit: "cover" }} />;
+  }
   return (
     <div className="avatar" style={{ width: size, height: size, background: user.color, fontSize: size * 0.4 }}>
       {user.name.trim().charAt(0).toUpperCase()}
