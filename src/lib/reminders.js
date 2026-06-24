@@ -4,7 +4,7 @@
 // at the right time even when Crica is closed. Where it is not supported (Safari,
 // Firefox), this quietly does nothing and the in-app notifications still work while
 // a tab is open.
-import { todayStr, parseDate, dateDiff } from "./dates";
+import { todayStr, parseDate, dateDiff, addDays } from "./dates";
 import { nextInvoiceDate } from "./invoices";
 
 const TAG = "crica-sched-";
@@ -23,7 +23,7 @@ async function getReg() {
 
 // Reschedule everything from the current data. Safe to call often: matching tags
 // replace earlier ones, so reminders never pile up or duplicate.
-export async function scheduleReminders({ tasks, clients, me }) {
+export async function scheduleReminders({ tasks, clients, habits, me }) {
   if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
   if (!triggersSupported()) return;
   const reg = await getReg();
@@ -62,5 +62,19 @@ export async function scheduleReminders({ tasks, clients, me }) {
   // Upcoming invoices, on the invoice day at 9:00 AM
   (clients || []).filter((c) => c.active).forEach((c) => {
     put("inv-" + c.id, at9(nextInvoiceDate(c)), "Invoice due", `Time to invoice ${c.name}`);
+  });
+
+  // Habit reminders, at your chosen time. Schedule the next couple of days so they
+  // keep firing even if you do not reopen Crica for a day. Today is skipped if done.
+  (habits || []).forEach((h) => {
+    if (h.ownerId !== me.id || !h.remindAt) return;
+    const [hh, mm] = h.remindAt.split(":").map(Number);
+    if (Number.isNaN(hh)) return;
+    for (let i = 0; i < 3; i++) {
+      const dateStr = addDays(todayStr(), i);
+      if (i === 0 && (h.completions || {})[dateStr]) continue; // already kept today
+      const when = parseDate(dateStr); when.setHours(hh, mm || 0, 0, 0);
+      put("habit-" + h.id + "-" + dateStr, when.getTime(), "Habit reminder", `Time for ${h.name}`);
+    }
   });
 }

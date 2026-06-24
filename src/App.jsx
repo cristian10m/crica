@@ -49,6 +49,7 @@ export default function App() {
   const [clients, setClientsState] = useState([]);
   const [finance, setFinanceState] = useState(DEFAULT_FINANCE);
   const [focus, setFocusState] = useState([]);
+  const [work, setWorkState] = useState([]);
   const [schedules, setSchedulesState] = useState({});
 
   const [dark, setDark] = useState(() => { try { return localStorage.getItem("crica_theme") === "dark"; } catch (e) { return false; } });
@@ -63,11 +64,19 @@ export default function App() {
     setFocusState((prev) => { const next = [...(prev || []), rec]; saveKey("focus", next); return next; });
   }, [currentUserId]);
 
+  const logWork = useCallback(({ userId, taskId, seconds }) => {
+    if (!seconds || seconds <= 0) return;
+    const rec = { id: uid(), userId, taskId, date: todayStr(), seconds, endedAt: Date.now() };
+    setWorkState((prev) => { const next = [...(prev || []), rec]; saveKey("work", next); return next; });
+  }, []);
+
   const focusEngine = useFocusEngine({ onBank: bankFocus });
   const pip = usePipWindow();
   const stopMyWork = () => setTasksState((prev) => {
     const next = (prev || []).map((t) => {
       if (!(t.working && t.working[currentUserId] != null)) return t;
+      const secs = Math.round((Date.now() - t.working[currentUserId]) / 1000);
+      logWork({ userId: currentUserId, taskId: t.id, seconds: secs });
       const w = { ...t.working }; delete w[currentUserId]; return { ...t, working: w };
     });
     saveKey("tasks", next); return next;
@@ -106,6 +115,7 @@ export default function App() {
       subscribeKey("clients", (c) => setClientsState(c || [])),
       subscribeKey("finance", (f) => { if (f) setFinanceState(f); }),
       subscribeKey("focus", (f) => setFocusState(f || [])),
+      subscribeKey("work", (w) => setWorkState(w || [])),
       subscribeKey("schedules", (s) => setSchedulesState(s || {})),
     ];
     return () => unsubs.forEach((u) => { try { u && u(); } catch (e) { /* ignore */ } });
@@ -203,8 +213,8 @@ export default function App() {
   // Pre-schedule background reminders (Chrome and Edge); harmless elsewhere
   useEffect(() => {
     if (!notifOn || !me) return;
-    scheduleReminders({ tasks, clients, me });
-  }, [tasks, clients, me, notifOn]);
+    scheduleReminders({ tasks, clients, habits, me });
+  }, [tasks, clients, habits, me, notifOn]);
 
   // Mini floating window (desktop): live while focusing or working a task
   const myWorkingTask = currentUserId ? tasks.find((t) => t.working && t.working[currentUserId] != null) : null;
@@ -219,11 +229,11 @@ export default function App() {
   if (!currentUserId || !me) return <><GlobalStyle /><LoginScreen users={users} onLogin={loginAs} /></>;
 
   const renderTab = () => {
-    if (showSettings) return <ProfileTab users={users} me={me} setUsers={setUsers} onLogout={logout} dark={dark} setDark={setDark} notifOn={notifOn} enableNotifs={enableNotifs} habits={habits} tasks={tasks} focus={focus} />;
+    if (showSettings) return <ProfileTab users={users} me={me} setUsers={setUsers} onLogout={logout} dark={dark} setDark={setDark} notifOn={notifOn} enableNotifs={enableNotifs} habits={habits} tasks={tasks} focus={focus} work={work} />;
     switch (tab) {
       case "dashboard": return <Dashboard users={users} me={me} habits={habits} tasks={tasks} finance={finance} focus={focus} />;
       case "habits": return <HabitsTab users={users} me={me} habits={habits} setHabits={setHabits} />;
-      case "tasks": return <TasksTab users={users} me={me} tasks={tasks} setTasks={setTasks} clients={clients} board={tasksBoard} setBoard={setTasksBoard} onWorkStart={() => pip.openPip()} />;
+      case "tasks": return <TasksTab users={users} me={me} tasks={tasks} setTasks={setTasks} clients={clients} board={tasksBoard} setBoard={setTasksBoard} onWorkStart={() => pip.openPip()} onWorkEnd={logWork} />;
       case "vault": return <CompanyTab finance={finance} setFinance={setFinance} clients={clients} setClients={setClients} />;
       case "report": return <DailyReport users={users} me={me} habits={habits} tasks={tasks} focus={focus} schedules={schedules} setSchedules={setSchedules} />;
       default: return null;

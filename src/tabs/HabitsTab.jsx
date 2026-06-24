@@ -107,11 +107,14 @@ function HabitModal({ open, habit, onClose, onSave, onDelete }) {
   const [icon, setIcon] = useState("dumbbell");
   const [freqType, setFreqType] = useState("daily");
   const [perWeek, setPerWeek] = useState(3);
+  const [remindOn, setRemindOn] = useState(false);
+  const [remindAt, setRemindAt] = useState("08:00");
   useEffect(() => {
     if (open) {
       setName(habit?.name || ""); setIcon(habit?.icon || "dumbbell");
       setFreqType(habit?.freqType === "weekly" ? "weekly" : "daily");
       setPerWeek(Math.max(1, Math.min(6, habit?.perWeek || 3)));
+      setRemindOn(!!habit?.remindAt); setRemindAt(habit?.remindAt || "08:00");
     }
   }, [open, habit]);
   return (
@@ -143,10 +146,21 @@ function HabitModal({ open, habit, onClose, onSave, onDelete }) {
           ? `Hit it ${perWeek} day${perWeek === 1 ? "" : "s"} a week to keep the week, and missing a day in between will not break you.`
           : "Keep it every day. Miss one day for a warning, miss two in a row and the streak resets."}
       </p>
+      <div className="toggle-row" style={{ marginTop: 4 }}>
+        <span>Remind me daily</span>
+        <button className={"toggle " + (remindOn ? "toggle-on" : "")} onClick={() => setRemindOn(!remindOn)} aria-label="Toggle reminder"><span className="toggle-knob" /></button>
+      </div>
+      {remindOn && (
+        <div className="rota-times" style={{ marginBottom: 4 }}>
+          <span className="field-label" style={{ margin: 0 }}>At</span>
+          <input type="time" value={remindAt} onChange={(e) => setRemindAt(e.target.value)} />
+          <span className="muted-small">if not done yet</span>
+        </div>
+      )}
       <p className="muted-small" style={{ marginTop: 8 }}>Every habit kept is worth <b>+{HABIT_POINTS}</b> points for the day. They are all hard to keep, so they all count the same.</p>
       <div className="modal-actions">
         {habit && <Btn variant="ghost-danger" onClick={() => onDelete(habit.id)}><Trash2 size={16} /> Delete</Btn>}
-        <Btn variant="primary" onClick={() => name.trim() && onSave({ ...(habit || {}), name: name.trim(), icon, freqType, perWeek: freqType === "weekly" ? perWeek : null })}>Save</Btn>
+        <Btn variant="primary" onClick={() => name.trim() && onSave({ ...(habit || {}), name: name.trim(), icon, freqType, perWeek: freqType === "weekly" ? perWeek : null, remindAt: remindOn ? remindAt : null })}>Save</Btn>
       </div>
     </Modal>
   );

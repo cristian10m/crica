@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import { Plus, Check, Trash2, GripVertical, CheckSquare, Users, Building2, Clock, Filter, Hand, Inbox, Play, Square, Timer, Lock } from "lucide-react";
+import { Plus, Check, Trash2, GripVertical, CheckSquare, Users, Building2, Clock, Filter, Hand, Inbox, Play, Square, Timer, Lock, Repeat } from "lucide-react";
 import { Card, Btn, IconBtn, Modal, Field, Segmented, Avatar, PageHead } from "../components/ui";
 import { DraggableList } from "../components/DraggableList";
-import { todayStr, dateDiff, prettyDate } from "../lib/dates";
+import { todayStr, dateDiff, prettyDate, parseDate, toDateStr, addDays } from "../lib/dates";
 import { fireConfetti } from "../lib/confetti";
 import { uid } from "../lib/format";
 import { TASK_IMPORTANCE } from "../lib/constants";
@@ -15,8 +15,16 @@ const fmtElapsed = (ms) => {
   return `${ss}s`;
 };
 const isPriv = (t) => !!(t.isPrivate || t.private);
+const REPEAT_LABEL = { daily: "Daily", weekly: "Weekly", monthly: "Monthly" };
+const advanceDate = (dateStr, repeat) => {
+  const base = parseDate(dateStr || todayStr());
+  if (repeat === "daily") base.setDate(base.getDate() + 1);
+  else if (repeat === "weekly") base.setDate(base.getDate() + 7);
+  else if (repeat === "monthly") base.setMonth(base.getMonth() + 1);
+  return toDateStr(base);
+};
 
-export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard, setBoard, onWorkStart }) {
+export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard, setBoard, onWorkStart, onWorkEnd }) {
   const board = propBoard || "pool"; // unclaimed tasks are the default view
   const [filter, setFilter] = useState("active");
   const [taskModal, setTaskModal] = useState(null); // null | "new" | task
@@ -47,10 +55,24 @@ export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard
   const completeTask = (task, e) => {
     const done = !!(task.completed || {})[board];
     const comp = { ...(task.completed || {}) };
-    if (done) delete comp[board]; else comp[board] = todayStr();
-    const work = { ...(task.working || {}) }; if (!done) delete work[board]; // finishing it stops your timer
-    setTasks(tasks.map((t) => t.id === task.id ? { ...t, completed: comp, working: work } : t));
+    const work = { ...(task.working || {}) };
+    let logSecs = 0;
+    if (done) { delete comp[board]; }
+    else {
+      comp[board] = todayStr();
+      if (work[board] != null) { logSecs = Math.round((Date.now() - work[board]) / 1000); delete work[board]; }
+    }
+    let spawnedNext = task.spawnedNext;
+    let nextInstance = null;
+    if (!done && task.repeat && !task.spawnedNext) {
+      spawnedNext = true;
+      nextInstance = { ...task, id: uid(), completed: {}, working: {}, spawnedNext: false, createdDate: todayStr(), dueDate: advanceDate(task.dueDate, task.repeat), order: tasks.length + 1 };
+    }
+    let next = tasks.map((t) => t.id === task.id ? { ...t, completed: comp, working: work, spawnedNext } : t);
+    if (nextInstance) next = [...next, nextInstance];
+    setTasks(next);
     if (!done) { const r = e?.currentTarget?.getBoundingClientRect(); fireConfetti(r ? r.left + r.width / 2 : undefined, r ? r.top : undefined); }
+    if (logSecs > 0 && onWorkEnd) onWorkEnd({ userId: board, taskId: task.id, seconds: logSecs });
   };
 
   const claim = (task, e) => {
@@ -64,6 +86,8 @@ export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard
   // Pick the one task you are working on right now. Starting one stops any other.
   const startWorking = (task) => {
     const now = Date.now();
+    const prev = tasks.find((t) => t.id !== task.id && t.working && t.working[me.id] != null);
+    if (prev) { const secs = Math.round((now - prev.working[me.id]) / 1000); if (secs > 0 && onWorkEnd) onWorkEnd({ userId: me.id, taskId: prev.id, seconds: secs }); }
     setTasks(tasks.map((t) => {
       if (t.id === task.id) return { ...t, working: { ...(t.working || {}), [me.id]: now } };
       if (t.working && t.working[me.id] != null) { const w = { ...t.working }; delete w[me.id]; return { ...t, working: w }; }
@@ -72,6 +96,8 @@ export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard
     if (onWorkStart) onWorkStart();
   };
   const stopWorking = (task) => {
+    const start = task.working && task.working[me.id];
+    if (start != null) { const secs = Math.round((Date.now() - start) / 1000); if (secs > 0 && onWorkEnd) onWorkEnd({ userId: me.id, taskId: task.id, seconds: secs }); }
     setTasks(tasks.map((t) => {
       if (t.id !== task.id) return t;
       const w = { ...(t.working || {}) }; delete w[me.id];
@@ -164,6 +190,7 @@ export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard
                   <div className="task-meta">
                     <span className="chip" style={{ color: imp.color, borderColor: imp.color + "55" }}>{imp.label}{isPriv(t) ? "" : ` +${imp.points}`}</span>
                     {isPriv(t) && <span className="chip private-chip"><Lock size={11} /> Private</span>}
+                    {t.repeat && <span className="chip"><Repeat size={11} /> {REPEAT_LABEL[t.repeat]}</span>}
                     {client && <span className="chip"><Building2 size={11} /> {client.name}</span>}
                     {both && <span className="chip"><Users size={11} /> Both</span>}
                     {t.dueDate && <span className={"chip " + (dueSoon ? "warn" : "")}><Clock size={11} /> {prettyDate(t.dueDate)}</span>}
@@ -232,12 +259,14 @@ function TaskModal({ open, task, users, me, clients, onClose, onSave, onDelete }
   const [dueDate, setDueDate] = useState("");
   const [importance, setImportance] = useState("medium");
   const [priv, setPriv] = useState(false);
+  const [repeat, setRepeat] = useState("none");
   useEffect(() => {
     if (open) {
       setTitle(task?.title || ""); setNotes(task?.notes || "");
       setAssignees(task?.assignees || [me.id]); setClientId(task?.clientId || "");
       setDueDate(task?.dueDate || ""); setImportance(task?.importance || "medium");
       setPriv(!!(task?.isPrivate || task?.private));
+      setRepeat(task?.repeat || "none");
     }
   }, [open, task]);
   const toggleAssignee = (id) => setAssignees((a) => a.includes(id) ? (a.length > 1 ? a.filter((x) => x !== id) : a) : [...a, id]);
@@ -274,9 +303,16 @@ function TaskModal({ open, task, users, me, clients, onClose, onSave, onDelete }
         <Field label="Due date"><input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} /></Field>
       </div>
       <ImportancePills importance={importance} setImportance={setImportance} />
+      <span className="field-label">Repeats</span>
+      <div className="seg-pills">
+        {[["none", "Never"], ["daily", "Daily"], ["weekly", "Weekly"], ["monthly", "Monthly"]].map(([k, lbl]) => (
+          <button key={k} className={"pill " + (repeat === k ? "pill-on" : "")} onClick={() => setRepeat(k)}>{lbl}</button>
+        ))}
+      </div>
+      {repeat !== "none" && <p className="muted-small" style={{ marginTop: 6 }}>When you finish it, the next one is created automatically{dueDate ? ", with the due date moved forward" : ""}.</p>}
       <div className="modal-actions">
         {task && <Btn variant="ghost-danger" onClick={() => onDelete(task.id)}><Trash2 size={16} /> Delete</Btn>}
-        <Btn onClick={() => title.trim() && onSave({ ...(task || {}), title: title.trim(), notes, assignees: priv ? [me.id] : assignees, clientId: clientId || null, dueDate: dueDate || null, importance, isPrivate: priv })}>Save</Btn>
+        <Btn onClick={() => title.trim() && onSave({ ...(task || {}), title: title.trim(), notes, assignees: priv ? [me.id] : assignees, clientId: clientId || null, dueDate: dueDate || null, importance, isPrivate: priv, repeat: repeat === "none" ? null : repeat })}>Save</Btn>
       </div>
     </Modal>
   );

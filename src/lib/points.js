@@ -146,13 +146,14 @@ export function rankFor(points) {
 }
 
 // All-time profile numbers for one person, including the head to head record vs the other.
-export function profileStats(user, other, habits, tasks, focus) {
+export function profileStats(user, other, habits, tasks, focus, work = []) {
   const points = totalPoints(user.id, habits, tasks, focus);
   const tasksDone = tasks.filter((t) => (t.completed || {})[user.id]).length;
   const myHabits = habits.filter((h) => h.ownerId === user.id);
   const habitsKept = myHabits.reduce((s, h) => s + Object.values(h.completions || {}).filter(Boolean).length, 0);
   const bestStreak = myHabits.length ? Math.max(...myHabits.map(bestStreakEver)) : 0;
   const focusSec = focusSecondsInRange(user.id, "0000-00-00", "9999-99-99", focus);
+  const workedSec = (work || []).reduce((s, w) => (w.userId === user.id ? s + (w.seconds || 0) : s), 0);
 
   const dates = new Set();
   habits.forEach((h) => Object.keys(h.completions || {}).forEach((d) => { if (h.completions[d]) dates.add(d); }));
@@ -167,5 +168,5 @@ export function profileStats(user, other, habits, tasks, focus) {
     else if (other && theirs > mine && theirs > 0) daysLost++;
   });
 
-  return { points, tasksDone, habitsKept, bestStreak, focusSec, daysWon, daysLost, rank: rankFor(points) };
+  return { points, tasksDone, habitsKept, bestStreak, focusSec, workedSec, daysWon, daysLost, rank: rankFor(points) };
 }

@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Camera, Check, LogOut, Trophy, Flame, CheckSquare, Repeat, Timer, Crown, Swords, TrendingUp, Zap, Trash2 } from "lucide-react";
+import { Camera, Check, LogOut, Trophy, Flame, CheckSquare, Repeat, Timer, Crown, Swords, TrendingUp, Zap, Trash2, Briefcase } from "lucide-react";
 import { Card, Btn, Field, Avatar, PageHead } from "../components/ui";
 import { hashPw } from "../lib/format";
 import { BLUE } from "../lib/constants";
@@ -26,12 +26,12 @@ function computeBadges(s) {
   return b;
 }
 
-export function ProfileTab({ users, me, setUsers, onLogout, dark, setDark, notifOn, enableNotifs, habits, tasks, focus }) {
+export function ProfileTab({ users, me, setUsers, onLogout, dark, setDark, notifOn, enableNotifs, habits, tasks, focus, work = [] }) {
   const [viewId, setViewId] = useState(me.id);
   const viewed = users.find((u) => u.id === viewId) || me;
   const other = users.find((u) => u.id !== viewed.id);
   const isSelf = viewed.id === me.id;
-  const stats = profileStats(viewed, other, habits, tasks, focus);
+  const stats = profileStats(viewed, other, habits, tasks, focus, work);
   const badges = computeBadges(stats);
 
   const h2h = !other ? null
@@ -94,6 +94,7 @@ export function ProfileTab({ users, me, setUsers, onLogout, dark, setDark, notif
         <StatBox icon={<Flame size={18} />} label="Best streak" value={stats.bestStreak} accent="#FF3B30" />
         <StatBox icon={<Repeat size={18} />} label="Habit days kept" value={stats.habitsKept} accent="#5AC8FA" />
         <StatBox icon={<Timer size={18} />} label="Focus time" value={fmtFocus(stats.focusSec)} accent="#AF52DE" />
+        <StatBox icon={<Briefcase size={18} />} label="Hours worked" value={fmtFocus(stats.workedSec)} accent="#0a8a6e" />
       </div>
 
       <Card>
