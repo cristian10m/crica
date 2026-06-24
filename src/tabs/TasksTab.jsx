@@ -35,6 +35,8 @@ export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard
   const [collapsed, setCollapsed] = useState(() => new Set());
   const [addingSub, setAddingSub] = useState(null); // parentId currently adding a subtask to
   const [subText, setSubText] = useState("");
+  const [editingSub, setEditingSub] = useState(null); // subtask id being renamed
+  const [editText, setEditText] = useState("");
   const [, setTick] = useState(0);
   const isPool = board === "pool";
   const boardUser = users.find((u) => u.id === board);
@@ -145,6 +147,8 @@ export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard
     setTasks(tasks.map((t) => t.id === sub.id ? { ...t, completed: comp } : t));
   };
   const removeSub = (id) => setTasks(tasks.filter((t) => t.id !== id));
+  const renameSub = (id, title) => { const v = title.trim(); if (v) setTasks(tasks.map((t) => t.id === id ? { ...t, title: v } : t)); setEditingSub(null); };
+  const reorderSubs = (newList) => { const map = {}; newList.forEach((s, i) => { map[s.id] = i; }); setTasks(tasks.map((t) => t.id in map ? { ...t, order: map[t.id] } : t)); };
   const toggleCollapse = (id) => setCollapsed((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const submitSub = (parent) => { if (!subText.trim()) return; addSubtask(parent, subText); setSubText(""); };
   const reorder = (newList) => {
@@ -263,16 +267,24 @@ export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard
 
                 {showKids && (
                   <div className="subtasks">
-                    {subs.map((s) => {
+                    <DraggableList items={subs} getKey={(s) => s.id} onReorder={reorderSubs} renderItem={(s, sctx) => {
                       const sd = !!(s.completed || {})[board];
+                      const editing = editingSub === s.id;
                       return (
-                        <div key={s.id} className={"subtask-item " + (sd ? "done" : "")}>
+                        <div className={"subtask-item " + (sd ? "done" : "")}>
+                          <button {...sctx.handle} className="sub-handle"><GripVertical size={14} /></button>
                           <button className={"subtask-check " + (sd ? "on" : "")} onClick={() => toggleSub(s)} style={sd && boardUser ? { background: boardUser.color, borderColor: boardUser.color } : {}}>{sd && <Check size={13} />}</button>
-                          <span className="subtask-title">{s.title}</span>
+                          {editing ? (
+                            <input autoFocus className="subtask-input" value={editText} onChange={(e) => setEditText(e.target.value)}
+                              onKeyDown={(e) => { if (e.key === "Enter") renameSub(s.id, editText); if (e.key === "Escape") setEditingSub(null); }}
+                              onBlur={() => renameSub(s.id, editText)} />
+                          ) : (
+                            <span className="subtask-title" onClick={() => { setEditingSub(s.id); setEditText(s.title); }} title="Tap to edit">{s.title}</span>
+                          )}
                           <button className="subtask-del" onClick={() => removeSub(s.id)} aria-label="Delete subtask"><X size={14} /></button>
                         </div>
                       );
-                    })}
+                    }} />
                     {addingSub === t.id ? (
                       <div className="subtask-item subtask-adding">
                         <span className="subtask-check ghost"><CornerDownRight size={13} /></span>
