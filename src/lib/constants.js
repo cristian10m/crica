@@ -7,8 +7,8 @@ export const HABIT_POINTS = 10; // every habit is worth the same, they are all h
 export const TASK_IMPORTANCE = {
   low: { label: "Low", points: 5, color: "#86868b" },
   medium: { label: "Medium", points: 10, color: BLUE },
-  high: { label: "High", points: 20, color: "#0a5fb8" },
-  urgent: { label: "Urgent", points: 35, color: "#1d1d1f" },
+  high: { label: "High", points: 20, color: "#FF9500" },
+  urgent: { label: "Urgent", points: 35, color: "#FF3B30" },
 };
 export const HABIT_ICONS = ["dumbbell", "book", "water", "sun", "moon", "run", "code", "phone", "leaf", "coffee", "money", "heart"];
 export const ICON_GLYPH = {

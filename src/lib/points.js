@@ -96,6 +96,7 @@ export function lastDone(habit) {
 
 export function habitPoints(h) { return HABIT_POINTS; }
 export function taskPoints(t) {
+  if (t.parentId) return 0; // subtasks are just a checklist, the parent carries the points
   if (t.isPrivate || t.private) return 0; // personal tasks do not score
   if (typeof t.points === "number") return t.points; // bounty tasks carry their own value
   return (TASK_IMPORTANCE[t.importance] || TASK_IMPORTANCE.medium).points;
@@ -148,7 +149,7 @@ export function rankFor(points) {
 // All-time profile numbers for one person, including the head to head record vs the other.
 export function profileStats(user, other, habits, tasks, focus, work = []) {
   const points = totalPoints(user.id, habits, tasks, focus);
-  const tasksDone = tasks.filter((t) => (t.completed || {})[user.id]).length;
+  const tasksDone = tasks.filter((t) => !t.parentId && (t.completed || {})[user.id]).length;
   const myHabits = habits.filter((h) => h.ownerId === user.id);
   const habitsKept = myHabits.reduce((s, h) => s + Object.values(h.completions || {}).filter(Boolean).length, 0);
   const bestStreak = myHabits.length ? Math.max(...myHabits.map(bestStreakEver)) : 0;

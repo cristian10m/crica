@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Check, Trash2, GripVertical, CheckSquare, Users, Building2, Clock, Filter, Hand, Inbox, Play, Square, Timer, Lock, Repeat } from "lucide-react";
+import { Plus, Check, Trash2, GripVertical, CheckSquare, Users, Building2, Clock, Filter, Hand, Inbox, Play, Square, Timer, Lock, Repeat, ChevronDown, ChevronRight, CornerDownRight, Search, X } from "lucide-react";
 import { Card, Btn, IconBtn, Modal, Field, Segmented, Avatar, PageHead } from "../components/ui";
 import { DraggableList } from "../components/DraggableList";
 import { todayStr, dateDiff, prettyDate, parseDate, toDateStr, addDays } from "../lib/dates";
@@ -15,6 +15,8 @@ const fmtElapsed = (ms) => {
   return `${ss}s`;
 };
 const isPriv = (t) => !!(t.isPrivate || t.private);
+const IMPORTANCE_RANK = { urgent: 0, high: 1, medium: 2, low: 3 };
+const rankOf = (t) => IMPORTANCE_RANK[t.importance] ?? 2;
 const REPEAT_LABEL = { daily: "Daily", weekly: "Weekly", monthly: "Monthly" };
 const advanceDate = (dateStr, repeat) => {
   const base = parseDate(dateStr || todayStr());
@@ -29,10 +31,15 @@ export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard
   const [filter, setFilter] = useState("active");
   const [taskModal, setTaskModal] = useState(null); // null | "new" | task
   const [poolModal, setPoolModal] = useState(null); // null | "new" | task
+  const [query, setQuery] = useState("");
+  const [collapsed, setCollapsed] = useState(() => new Set());
+  const [addingSub, setAddingSub] = useState(null); // parentId currently adding a subtask to
+  const [subText, setSubText] = useState("");
   const [, setTick] = useState(0);
   const isPool = board === "pool";
   const boardUser = users.find((u) => u.id === board);
   const isMyBoard = board === me.id;
+  const q = query.trim().toLowerCase();
 
   // Tick once a second while something is being worked on, so elapsed time stays live.
   const anyWorking = tasks.some((t) => t.working && t.working[board] != null);
@@ -42,15 +49,24 @@ export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard
     return () => clearInterval(id);
   }, [anyWorking]);
 
+  const subtasksOf = (id) => tasks.filter((t) => t.parentId === id).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const matchesQuery = (t) => {
+    if (!q) return true;
+    if ((t.title || "").toLowerCase().includes(q) || (t.notes || "").toLowerCase().includes(q)) return true;
+    return subtasksOf(t.id).some((s) => (s.title || "").toLowerCase().includes(q));
+  };
+
+  // Top-level tasks only, grouped by urgency (urgent first), newest at the top of each group.
   const visible = tasks
-    .filter((t) => !t.pool && (t.assignees || []).includes(board))
+    .filter((t) => !t.pool && !t.parentId && (t.assignees || []).includes(board))
     .filter((t) => {
       const done = !!(t.completed || {})[board];
       return filter === "all" ? true : filter === "done" ? done : !done;
     })
-    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    .filter(matchesQuery)
+    .sort((a, b) => rankOf(a) - rankOf(b) || (a.order ?? 0) - (b.order ?? 0));
 
-  const pool = tasks.filter((t) => t.pool).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const pool = tasks.filter((t) => t.pool && matchesQuery(t)).sort((a, b) => rankOf(a) - rankOf(b) || (a.order ?? 0) - (b.order ?? 0));
 
   const completeTask = (task, e) => {
     const done = !!(task.completed || {})[board];
@@ -105,17 +121,32 @@ export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard
     }));
   };
 
+  const topOrder = () => tasks.reduce((m, t) => Math.min(m, t.order ?? 0), 0) - 1;
   const saveTask = (data) => {
     if (data.id) setTasks(tasks.map((t) => t.id === data.id ? { ...t, ...data } : t));
-    else setTasks([...tasks, { id: uid(), creatorId: me.id, createdDate: todayStr(), completed: {}, order: tasks.length, ...data }]);
+    else setTasks([...tasks, { id: uid(), creatorId: me.id, createdDate: todayStr(), completed: {}, order: topOrder(), ...data }]);
     setTaskModal(null);
   };
   const savePool = (data) => {
     if (data.id) setTasks(tasks.map((t) => t.id === data.id ? { ...t, ...data } : t));
-    else setTasks([...tasks, { id: uid(), creatorId: me.id, createdDate: todayStr(), completed: {}, order: tasks.length, pool: true, assignees: [], ...data }]);
+    else setTasks([...tasks, { id: uid(), creatorId: me.id, createdDate: todayStr(), completed: {}, order: topOrder(), pool: true, assignees: [], ...data }]);
     setPoolModal(null);
   };
-  const removeTask = (id) => { setTasks(tasks.filter((t) => t.id !== id)); setTaskModal(null); setPoolModal(null); };
+  const removeTask = (id) => { setTasks(tasks.filter((t) => t.id !== id && t.parentId !== id)); setTaskModal(null); setPoolModal(null); };
+
+  // Subtasks: a small checklist under a parent. No points, inherit the parent's board.
+  const addSubtask = (parent, title) => {
+    const t = title.trim(); if (!t) return;
+    setTasks([...tasks, { id: uid(), parentId: parent.id, creatorId: me.id, createdDate: todayStr(), completed: {}, assignees: parent.assignees || [board], importance: "low", order: Date.now(), title: t }]);
+  };
+  const toggleSub = (sub) => {
+    const comp = { ...(sub.completed || {}) };
+    if (comp[board]) delete comp[board]; else comp[board] = todayStr();
+    setTasks(tasks.map((t) => t.id === sub.id ? { ...t, completed: comp } : t));
+  };
+  const removeSub = (id) => setTasks(tasks.filter((t) => t.id !== id));
+  const toggleCollapse = (id) => setCollapsed((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const submitSub = (parent) => { if (!subText.trim()) return; addSubtask(parent, subText); setSubText(""); };
   const reorder = (newList) => {
     const map = {}; newList.forEach((t, i) => map[t.id] = i);
     setTasks(tasks.map((t) => t.id in map ? { ...t, order: map[t.id] } : t));
@@ -133,6 +164,13 @@ export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard
       </PageHead>
 
       <Segmented value={board} onChange={setBoard} options={options} />
+
+      <div className="search-bar">
+        <Search size={15} />
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search tasks and subtasks" />
+        {query && <button className="search-clear" onClick={() => setQuery("")} aria-label="Clear"><X size={15} /></button>}
+      </div>
+
 
       {isPool ? (
         <>
@@ -169,7 +207,7 @@ export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard
             ))}
           </div>
 
-          {visible.length === 0 && <Card className="empty"><CheckSquare size={26} /><div>Nothing here. {filter === "done" ? "No tasks completed yet." : "Add a task to get going."}</div></Card>}
+          {visible.length === 0 && <Card className="empty"><CheckSquare size={26} /><div>{q ? "No tasks match your search." : filter === "done" ? "No tasks completed yet." : "Nothing here. Add a task to get going."}</div></Card>}
 
           <DraggableList items={visible.filter((t) => !(isPriv(t) && t.creatorId !== me.id))} getKey={(t) => t.id} onReorder={reorder} renderItem={(t, ctx) => {
             const done = !!(t.completed || {})[board];
@@ -179,34 +217,72 @@ export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard
             const both = (t.assignees || []).length > 1;
             const dueSoon = t.dueDate && !done && dateDiff(t.dueDate, todayStr()) <= 1;
             const workingStart = t.working && t.working[board];
+            const subs = subtasksOf(t.id);
+            const subDone = subs.filter((s) => (s.completed || {})[board]).length;
+            const isCollapsed = collapsed.has(t.id);
+            const showKids = !done && (addingSub === t.id || (subs.length > 0 && (!isCollapsed || q.length > 0)));
             return (
               <Card className={"task-card " + (done ? "task-done " : "") + (workingStart ? "task-working" : "")}>
-                <button className="drag-handle" {...ctx.handle}><GripVertical size={18} /></button>
-                <button className={"task-check " + (done ? "on" : "")} onClick={(e) => completeTask(t, e)} style={done && boardUser ? { background: boardUser.color, borderColor: boardUser.color } : {}}>
-                  {done && <Check size={16} />}
-                </button>
-                <div className="task-main" onClick={() => setTaskModal(t)}>
-                  <div className="task-title">{t.title}</div>
-                  <div className="task-meta">
-                    <span className="chip" style={{ color: imp.color, borderColor: imp.color + "55" }}>{imp.label}{isPriv(t) ? "" : ` +${imp.points}`}</span>
-                    {isPriv(t) && <span className="chip private-chip"><Lock size={11} /> Private</span>}
-                    {t.repeat && <span className="chip"><Repeat size={11} /> {REPEAT_LABEL[t.repeat]}</span>}
-                    {client && <span className="chip"><Building2 size={11} /> {client.name}</span>}
-                    {both && <span className="chip"><Users size={11} /> Both</span>}
-                    {t.dueDate && <span className={"chip " + (dueSoon ? "warn" : "")}><Clock size={11} /> {prettyDate(t.dueDate)}</span>}
+                <div className="task-row">
+                  <button className="drag-handle" {...ctx.handle}><GripVertical size={18} /></button>
+                  <button className={"task-check " + (done ? "on" : "")} onClick={(e) => completeTask(t, e)} style={done && boardUser ? { background: boardUser.color, borderColor: boardUser.color } : {}}>
+                    {done && <Check size={16} />}
+                  </button>
+                  <div className="task-main" onClick={() => setTaskModal(t)}>
+                    <div className="task-title">{t.title}</div>
+                    <div className="task-meta">
+                      <span className="chip" style={{ color: imp.color, borderColor: imp.color + "55" }}>{imp.label}{isPriv(t) ? "" : ` +${imp.points}`}</span>
+                      {subs.length > 0 ? (
+                        <button className="subtask-toggle" onClick={(e) => { e.stopPropagation(); toggleCollapse(t.id); }}>
+                          {isCollapsed ? <ChevronRight size={13} /> : <ChevronDown size={13} />} {subDone}/{subs.length}
+                        </button>
+                      ) : (!done && (
+                        <button className="subtask-add-chip" onClick={(e) => { e.stopPropagation(); setAddingSub(t.id); setSubText(""); }}><Plus size={12} /> Subtask</button>
+                      ))}
+                      {isPriv(t) && <span className="chip private-chip"><Lock size={11} /> Private</span>}
+                      {t.repeat && <span className="chip"><Repeat size={11} /> {REPEAT_LABEL[t.repeat]}</span>}
+                      {client && <span className="chip"><Building2 size={11} /> {client.name}</span>}
+                      {both && <span className="chip"><Users size={11} /> Both</span>}
+                      {t.dueDate && <span className={"chip " + (dueSoon ? "warn" : "")}><Clock size={11} /> {prettyDate(t.dueDate)}</span>}
+                    </div>
+                    {t.creatorId !== board && creator && <div className="added-by">Added by {creator.name}</div>}
                   </div>
-                  {t.creatorId !== board && creator && <div className="added-by">Added by {creator.name}</div>}
+                  {!done && (
+                    <div className="work-ctrl">
+                      {workingStart ? (
+                        <>
+                          <span className="work-time" title="Time on this task"><Timer size={13} /> {fmtElapsed(Date.now() - workingStart)}</span>
+                          {isMyBoard && <IconBtn className="work-stop" onClick={() => stopWorking(t)} title="Stop"><Square size={15} /></IconBtn>}
+                        </>
+                      ) : (isMyBoard && (
+                        <button className="work-start" onClick={() => startWorking(t)} title="Start working on this"><Play size={15} /></button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                {!done && (
-                  <div className="work-ctrl">
-                    {workingStart ? (
-                      <>
-                        <span className="work-time" title="Time on this task"><Timer size={13} /> {fmtElapsed(Date.now() - workingStart)}</span>
-                        {isMyBoard && <IconBtn className="work-stop" onClick={() => stopWorking(t)} title="Stop"><Square size={15} /></IconBtn>}
-                      </>
-                    ) : (isMyBoard && (
-                      <button className="work-start" onClick={() => startWorking(t)} title="Start working on this"><Play size={15} /></button>
-                    ))}
+
+                {showKids && (
+                  <div className="subtasks">
+                    {subs.map((s) => {
+                      const sd = !!(s.completed || {})[board];
+                      return (
+                        <div key={s.id} className={"subtask-item " + (sd ? "done" : "")}>
+                          <button className={"subtask-check " + (sd ? "on" : "")} onClick={() => toggleSub(s)} style={sd && boardUser ? { background: boardUser.color, borderColor: boardUser.color } : {}}>{sd && <Check size={13} />}</button>
+                          <span className="subtask-title">{s.title}</span>
+                          <button className="subtask-del" onClick={() => removeSub(s.id)} aria-label="Delete subtask"><X size={14} /></button>
+                        </div>
+                      );
+                    })}
+                    {addingSub === t.id ? (
+                      <div className="subtask-item subtask-adding">
+                        <span className="subtask-check ghost"><CornerDownRight size={13} /></span>
+                        <input autoFocus className="subtask-input" value={subText} onChange={(e) => setSubText(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter") submitSub(t); if (e.key === "Escape") { setAddingSub(null); setSubText(""); } }}
+                          onBlur={() => { if (!subText.trim()) setAddingSub(null); }} placeholder="Add a step, press Enter" />
+                      </div>
+                    ) : (
+                      <button className="subtask-add" onClick={() => { setAddingSub(t.id); setSubText(""); }}><Plus size={13} /> Add subtask</button>
+                    )}
                   </div>
                 )}
               </Card>
@@ -216,7 +292,7 @@ export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard
           {visible.filter((t) => isPriv(t) && t.creatorId !== me.id).map((t) => {
             const done = !!(t.completed || {})[board];
             return (
-              <Card key={t.id} className="task-card censored">
+              <Card key={t.id} className="task-private-row censored">
                 <span className="priv-lock"><Lock size={16} /></span>
                 <div className="censored-name"><span className="blurred">Private task</span></div>
                 <div className="censored-stats">
@@ -228,7 +304,7 @@ export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard
         </>
       )}
 
-      <TaskModal open={taskModal !== null} task={taskModal === "new" ? null : taskModal} users={users} me={me} clients={clients}
+      <TaskModal open={taskModal !== null} task={taskModal === "new" ? null : taskModal} users={users} me={me} clients={clients} tasks={tasks} board={board}
         onClose={() => setTaskModal(null)} onSave={saveTask} onDelete={removeTask} />
       <PoolModal open={poolModal !== null} task={poolModal === "new" ? null : poolModal} clients={clients}
         onClose={() => setPoolModal(null)} onSave={savePool} onDelete={removeTask} />
@@ -251,7 +327,7 @@ function ImportancePills({ importance, setImportance }) {
   );
 }
 
-function TaskModal({ open, task, users, me, clients, onClose, onSave, onDelete }) {
+function TaskModal({ open, task, users, me, clients, tasks = [], board, onClose, onSave, onDelete }) {
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
   const [assignees, setAssignees] = useState([me.id]);
@@ -260,6 +336,7 @@ function TaskModal({ open, task, users, me, clients, onClose, onSave, onDelete }
   const [importance, setImportance] = useState("medium");
   const [priv, setPriv] = useState(false);
   const [repeat, setRepeat] = useState("none");
+  const [parentId, setParentId] = useState("");
   useEffect(() => {
     if (open) {
       setTitle(task?.title || ""); setNotes(task?.notes || "");
@@ -267,8 +344,11 @@ function TaskModal({ open, task, users, me, clients, onClose, onSave, onDelete }
       setDueDate(task?.dueDate || ""); setImportance(task?.importance || "medium");
       setPriv(!!(task?.isPrivate || task?.private));
       setRepeat(task?.repeat || "none");
+      setParentId(task?.parentId || "");
     }
   }, [open, task]);
+  const hasChildren = task && tasks.some((x) => x.parentId === task.id);
+  const parentChoices = tasks.filter((x) => !x.parentId && !x.pool && (x.assignees || []).includes(board) && x.id !== task?.id && !x.isPrivate && !x.private);
   const toggleAssignee = (id) => setAssignees((a) => a.includes(id) ? (a.length > 1 ? a.filter((x) => x !== id) : a) : [...a, id]);
   return (
     <Modal open={open} onClose={onClose} title={task ? "Edit task" : "New task"}>
@@ -310,9 +390,18 @@ function TaskModal({ open, task, users, me, clients, onClose, onSave, onDelete }
         ))}
       </div>
       {repeat !== "none" && <p className="muted-small" style={{ marginTop: 6 }}>When you finish it, the next one is created automatically{dueDate ? ", with the due date moved forward" : ""}.</p>}
+      {!priv && !hasChildren && parentChoices.length > 0 && (
+        <Field label="Part of (turn it into a subtask)">
+          <select value={parentId} onChange={(e) => setParentId(e.target.value)}>
+            <option value="">Nothing, it is its own task</option>
+            {parentChoices.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
+          </select>
+        </Field>
+      )}
+      {parentId && <p className="muted-small" style={{ marginTop: 6 }}>As a subtask it earns no points on its own. The points come from finishing the task it belongs to.</p>}
       <div className="modal-actions">
         {task && <Btn variant="ghost-danger" onClick={() => onDelete(task.id)}><Trash2 size={16} /> Delete</Btn>}
-        <Btn onClick={() => title.trim() && onSave({ ...(task || {}), title: title.trim(), notes, assignees: priv ? [me.id] : assignees, clientId: clientId || null, dueDate: dueDate || null, importance, isPrivate: priv, repeat: repeat === "none" ? null : repeat })}>Save</Btn>
+        <Btn onClick={() => title.trim() && onSave({ ...(task || {}), title: title.trim(), notes, assignees: priv ? [me.id] : assignees, clientId: clientId || null, dueDate: dueDate || null, importance, isPrivate: priv, repeat: repeat === "none" ? null : repeat, parentId: (!priv && !hasChildren && parentId) ? parentId : null })}>Save</Btn>
       </div>
     </Modal>
   );

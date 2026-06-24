@@ -11,7 +11,7 @@ export function DailyReport({ users, me, habits, tasks, focus = [], schedules = 
   const canForward = dateDiff(todayStr(), day) > 0;
 
   const data = users.map((u) => {
-    const tasksDone = tasks.filter((t) => (t.completed || {})[u.id] === day);
+    const tasksDone = tasks.filter((t) => !t.parentId && (t.completed || {})[u.id] === day);
     const habitsDone = habits.filter((h) => h.ownerId === u.id && (h.completions || {})[day]);
     const focusMin = Math.round(focusSecondsInRange(u.id, day, day, focus) / 60);
     const pts = pointsOnDay(u.id, day, habits, tasks, focus);

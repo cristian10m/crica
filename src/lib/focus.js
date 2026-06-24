@@ -60,7 +60,7 @@ export function useFocusEngine({ onBank }) {
     bankedRef.current = session.id;
     const points = earnedPoints(session.focusedMs);
     const seconds = Math.round(session.focusedMs / 1000);
-    if (points > 0 && onBank) onBank({ seconds, points });
+    if (seconds > 0 && onBank) onBank({ seconds, points }); // log the time even if it was too short to earn a point
   }, [session?.phase, session?.id]);
 
   // Persist an in-progress session so a refresh does not lose it.

@@ -291,6 +291,35 @@ export function GlobalStyle() {
     .dot { width: 11px; height: 11px; border-radius: 50%; background: rgba(0,0,0,0.12); }
     .private-chip { color: var(--ink-3); }
     .priv-lock { display: grid; place-items: center; color: var(--ink-3); width: 24px; flex: none; }
+
+    /* Task search */
+    .search-bar { display: flex; align-items: center; gap: 8px; padding: 9px 13px; margin-bottom: 12px; background: var(--surface); border: 1.5px solid var(--line); border-radius: 13px; color: var(--ink-3); }
+    .search-bar input { flex: 1; border: none; background: none; color: var(--ink); font-size: 14.5px; outline: none; padding: 0; }
+    .search-clear { border: none; background: none; color: var(--ink-3); cursor: pointer; display: grid; place-items: center; padding: 2px; border-radius: 6px; }
+    .search-clear:hover { color: var(--ink); background: var(--line-2); }
+
+    /* Subtasks */
+    .subtask-toggle { display: inline-flex; align-items: center; gap: 3px; border: none; background: var(--line-2); color: var(--ink-2); font-size: 11px; font-weight: 700; padding: 3px 9px 3px 6px; border-radius: 999px; cursor: pointer; }
+    .subtask-toggle:hover { color: var(--ink); }
+    .subtask-add-chip { display: inline-flex; align-items: center; gap: 4px; border: 1px dashed var(--line); background: transparent; color: var(--ink-3); font-size: 11px; font-weight: 600; padding: 2px 9px 2px 6px; border-radius: 999px; cursor: pointer; transition: all .15s; }
+    .subtask-add-chip:hover { color: var(--blue); border-color: var(--blue); }
+    .subtasks { display: flex; flex-direction: column; gap: 5px; padding: 2px 13px 12px 47px; }
+    .subtask-item { display: flex; align-items: center; gap: 10px; padding: 8px 11px; border-radius: 11px; background: var(--line-2); transition: background .25s ease; }
+    .subtask-item.done { background: rgba(52,199,89,0.12); animation: subFlash .55s ease; }
+    html.crica-dark .subtask-item.done { background: rgba(52,199,89,0.16); }
+    .subtask-check { width: 20px; height: 20px; flex: none; border-radius: 7px; border: 1.7px solid var(--line); background: var(--surface); display: grid; place-items: center; color: #fff; cursor: pointer; padding: 0; transition: border-color .15s; }
+    .subtask-check.on { animation: subPop .32s ease; }
+    .subtask-check.ghost { border: none; background: none; color: var(--ink-3); cursor: default; }
+    .subtask-title { flex: 1; font-size: 13.5px; color: var(--ink); transition: color .25s ease; min-width: 0; }
+    .subtask-item.done .subtask-title { text-decoration: line-through; color: var(--ink-3); }
+    .subtask-del { border: none; background: none; color: var(--ink-3); cursor: pointer; opacity: 0; display: grid; place-items: center; padding: 2px; flex: none; transition: opacity .15s, color .15s; }
+    .subtask-item:hover .subtask-del { opacity: 1; }
+    .subtask-del:hover { color: #ff3b30; }
+    .subtask-input { flex: 1; border: none; background: none; color: var(--ink); font-size: 13.5px; outline: none; padding: 0; min-width: 0; }
+    .subtask-add { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; border: none; background: none; color: var(--ink-3); font-size: 12.5px; font-weight: 600; cursor: pointer; padding: 3px 2px; }
+    .subtask-add:hover { color: var(--blue); }
+    @keyframes subPop { 0% { transform: scale(0.55); } 55% { transform: scale(1.28); } 100% { transform: scale(1); } }
+    @keyframes subFlash { 0% { background: rgba(52,199,89,0.4); } 100% { } }
     .icon-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-bottom: 14px; }
     .icon-pick { aspect-ratio: 1; border: 1.5px solid var(--line); background: #fff; border-radius: 12px; font-size: 20px; cursor: pointer; transition: all .15s; }
     .icon-pick.on { border-color: var(--blue); background: rgba(0,113,227,0.08); }
@@ -300,7 +329,9 @@ export function GlobalStyle() {
     .pill-on { border-color: var(--blue); color: var(--ink); background: rgba(0,113,227,0.06); }
 
     /* Tasks */
-    .task-card { display: flex; align-items: center; gap: 11px; padding: 12px 13px; }
+    .task-card { display: flex; flex-direction: column; align-items: stretch; gap: 0; padding: 0; }
+    .task-row { display: flex; align-items: center; gap: 11px; padding: 12px 13px; }
+    .task-private-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 13px; }
     .task-done .task-title { text-decoration: line-through; color: var(--ink-3); }
     .task-title { font-weight: 600; font-size: 14.5px; }
     .added-by { font-size: 11px; color: var(--blue); margin-top: 5px; font-weight: 500; }
