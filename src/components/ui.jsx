@@ -54,15 +54,22 @@ export function Ring({ value, size = 64, stroke = 7, color = BLUE, label, sub })
     </div>
   );
 }
+import { decoFile, decoSrc } from "../lib/shop";
+
 export function Avatar({ user, size = 34 }) {
   if (!user) return null;
-  if (user.avatar) {
-    return <img className="avatar" src={user.avatar} alt={user.name} style={{ width: size, height: size, objectFit: "cover" }} />;
-  }
+  const face = user.avatar
+    ? <img className="avatar" src={user.avatar} alt={user.name} style={{ width: size, height: size, objectFit: "cover" }} />
+    : <div className="avatar" style={{ width: size, height: size, background: user.color, fontSize: size * 0.4 }}>{user.name.trim().charAt(0).toUpperCase()}</div>;
+  const deco = decoFile(user);
+  if (!deco) return face;
+  const ds = Math.round(size * 1.35);
+  const off = Math.round((ds - size) / 2);
   return (
-    <div className="avatar" style={{ width: size, height: size, background: user.color, fontSize: size * 0.4 }}>
-      {user.name.trim().charAt(0).toUpperCase()}
-    </div>
+    <span className="avatar-wrap" style={{ width: size, height: size }}>
+      {face}
+      <img className="avatar-deco" src={decoSrc(deco)} alt="" style={{ width: ds, height: ds, top: -off, left: -off }} />
+    </span>
   );
 }
 export function PageHead({ title, subtitle, children }) {

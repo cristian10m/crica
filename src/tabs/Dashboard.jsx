@@ -8,6 +8,7 @@ import {
 import { Card, IconBtn, Avatar, Ring, PageHead } from "../components/ui";
 import { useCountUp } from "../lib/hooks";
 import { pointsOnDay, pointsInRange, totalPoints, evalHabit, focusSecondsInRange } from "../lib/points";
+import { nameStyle } from "../lib/shop";
 import { weekDates, startOfWeek, todayStr, parseDate, WEEKDAY, addDays, dateDiff, monthKey, prettyDate } from "../lib/dates";
 import { BLUE } from "../lib/constants";
 import { fmtMoney } from "../lib/format";
@@ -24,20 +25,21 @@ function StatTile({ icon, label, value, accent }) {
   );
 }
 
-export function Dashboard({ users, me, habits, tasks, finance, focus = [] }) {
+export function Dashboard({ users: allUsers, me, habits, tasks, finance, focus = [], work = [] }) {
+  const users = (allUsers || []).filter((u) => !u.hidden || u.id === me.id);
   const [anchor, setAnchor] = useState(todayStr());
   const week = useMemo(() => weekDates(anchor), [anchor]);
   const isCurrentWeek = startOfWeek(anchor) === startOfWeek(todayStr());
 
   const chartData = week.map((d) => {
     const row = { day: WEEKDAY[parseDate(d).getDay()], date: d };
-    users.forEach((u, i) => { row["u" + i] = pointsOnDay(u.id, d, habits, tasks, focus); });
+    users.forEach((u, i) => { row["u" + i] = pointsOnDay(u.id, d, habits, tasks, focus, work); });
     return row;
   });
 
   const weekFrom = week[0], weekTo = week[6];
-  const weekPoints = users.map((u) => pointsInRange(u.id, weekFrom, weekTo, habits, tasks, focus));
-  const allTime = users.map((u) => totalPoints(u.id, habits, tasks, focus));
+  const weekPoints = users.map((u) => pointsInRange(u.id, weekFrom, weekTo, habits, tasks, focus, work));
+  const allTime = users.map((u) => totalPoints(u.id, habits, tasks, focus, work));
   const myFocusSecWeek = focusSecondsInRange(me.id, weekFrom, weekTo, focus);
 
   const tasksDoneWeek = users.map((u) => tasks.filter((t) => { const c = (t.completed || {})[u.id]; return c && c >= weekFrom && c <= weekTo; }).length);
@@ -84,7 +86,7 @@ export function Dashboard({ users, me, habits, tasks, finance, focus = [] }) {
       <Card className="vs-card">
         <div className="vs-side">
           <Avatar user={users[0]} size={44} />
-          <div className="vs-name">{users[0].name}</div>
+          <div className="vs-name" style={nameStyle(users[0]) || undefined}>{users[0].name}</div>
           <div className="vs-points" style={{ color: users[0].color }}>{Math.round(useCountUp(weekPoints[0]))}</div>
           <div className="vs-lab">points</div>
         </div>
@@ -94,7 +96,7 @@ export function Dashboard({ users, me, habits, tasks, finance, focus = [] }) {
         </div>
         <div className="vs-side">
           <Avatar user={users[1]} size={44} />
-          <div className="vs-name">{users[1].name}</div>
+          <div className="vs-name" style={nameStyle(users[1]) || undefined}>{users[1].name}</div>
           <div className="vs-points" style={{ color: users[1].color }}>{Math.round(useCountUp(weekPoints[1]))}</div>
           <div className="vs-lab">points</div>
         </div>

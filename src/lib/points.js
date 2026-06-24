@@ -102,17 +102,32 @@ export function taskPoints(t) {
   return (TASK_IMPORTANCE[t.importance] || TASK_IMPORTANCE.medium).points;
 }
 
-export function pointsInRange(userId, from, to, habits, tasks, focus = []) {
+// Points a specific person earns from a task. For a task shared by both people the
+// importance value is split by how much work time each logged on it (equal split if
+// none was logged). Solo tasks pay the full value to the assignee.
+export function taskPointsFor(t, userId, work = []) {
+  const base = taskPoints(t);
+  if (base === 0) return 0;
+  const assignees = t.assignees || [];
+  if (assignees.length <= 1) return base;
+  const by = {};
+  (work || []).forEach((w) => { if (w.taskId === t.id && assignees.includes(w.userId)) by[w.userId] = (by[w.userId] || 0) + (w.seconds || 0); });
+  const total = assignees.reduce((s, id) => s + (by[id] || 0), 0);
+  if (total <= 0) return Math.round(base / assignees.length);
+  return Math.round(base * ((by[userId] || 0) / total));
+}
+
+export function pointsInRange(userId, from, to, habits, tasks, focus = [], work = []) {
   let pts = 0;
   habits.filter((h) => h.ownerId === userId).forEach((h) => {
     Object.keys(h.completions || {}).forEach((d) => { if (d >= from && d <= to && h.completions[d]) pts += habitPoints(h); });
   });
-  tasks.forEach((t) => { const c = (t.completed || {})[userId]; if (c && c >= from && c <= to) pts += taskPoints(t); });
+  tasks.forEach((t) => { const c = (t.completed || {})[userId]; if (c && c >= from && c <= to) pts += taskPointsFor(t, userId, work); });
   (focus || []).forEach((f) => { if (f.userId === userId && f.date >= from && f.date <= to) pts += (f.points || 0); });
   return pts;
 }
-export function pointsOnDay(userId, day, habits, tasks, focus = []) { return pointsInRange(userId, day, day, habits, tasks, focus); }
-export function totalPoints(userId, habits, tasks, focus = []) { return pointsInRange(userId, "0000-00-00", "9999-99-99", habits, tasks, focus); }
+export function pointsOnDay(userId, day, habits, tasks, focus = [], work = []) { return pointsInRange(userId, day, day, habits, tasks, focus, work); }
+export function totalPoints(userId, habits, tasks, focus = [], work = []) { return pointsInRange(userId, "0000-00-00", "9999-99-99", habits, tasks, focus, work); }
 
 export function focusSecondsInRange(userId, from, to, focus = []) {
   return (focus || []).reduce((s, f) => (f.userId === userId && f.date >= from && f.date <= to ? s + (f.seconds || 0) : s), 0);
@@ -148,7 +163,7 @@ export function rankFor(points) {
 
 // All-time profile numbers for one person, including the head to head record vs the other.
 export function profileStats(user, other, habits, tasks, focus, work = []) {
-  const points = totalPoints(user.id, habits, tasks, focus);
+  const points = totalPoints(user.id, habits, tasks, focus, work);
   const tasksDone = tasks.filter((t) => !t.parentId && (t.completed || {})[user.id]).length;
   const myHabits = habits.filter((h) => h.ownerId === user.id);
   const habitsKept = myHabits.reduce((s, h) => s + Object.values(h.completions || {}).filter(Boolean).length, 0);
@@ -163,8 +178,8 @@ export function profileStats(user, other, habits, tasks, focus, work = []) {
 
   let daysWon = 0, daysLost = 0;
   dates.forEach((d) => {
-    const mine = pointsOnDay(user.id, d, habits, tasks, focus);
-    const theirs = other ? pointsOnDay(other.id, d, habits, tasks, focus) : 0;
+    const mine = pointsOnDay(user.id, d, habits, tasks, focus, work);
+    const theirs = other ? pointsOnDay(other.id, d, habits, tasks, focus, work) : 0;
     if (mine > theirs && mine > 0) daysWon++;
     else if (other && theirs > mine && theirs > 0) daysLost++;
   });

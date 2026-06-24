@@ -1,9 +1,10 @@
 import { useState, useRef } from "react";
-import { Camera, Check, LogOut, Trophy, Flame, CheckSquare, Repeat, Timer, Crown, Swords, TrendingUp, Zap, Trash2, Briefcase } from "lucide-react";
+import { Camera, Check, LogOut, Trophy, Flame, CheckSquare, Repeat, Timer, Crown, Swords, TrendingUp, Zap, Trash2, Briefcase, Coins, Lock, Sparkles } from "lucide-react";
 import { Card, Btn, Field, Avatar, PageHead } from "../components/ui";
 import { hashPw } from "../lib/format";
 import { BLUE } from "../lib/constants";
 import { profileStats } from "../lib/points";
+import { SHOP_ITEMS, KIND_LABEL, nameStyle, earnedBalance, decoSrc } from "../lib/shop";
 
 const fmtFocus = (sec) => {
   const m = Math.round(sec / 60);
@@ -33,6 +34,18 @@ export function ProfileTab({ users, me, setUsers, onLogout, dark, setDark, notif
   const isSelf = viewed.id === me.id;
   const stats = profileStats(viewed, other, habits, tasks, focus, work);
   const badges = computeBadges(stats);
+  const balance = earnedBalance(stats.points, viewed);
+  const owned = new Set(viewed.owned || []);
+  const equip = viewed.equip || {};
+  const buy = (item) => {
+    if (owned.has(item.id) || balance < item.cost) return;
+    setUsers(users.map((u) => u.id === me.id ? { ...u, owned: [...(u.owned || []), item.id], spent: (u.spent || 0) + item.cost, equip: { ...(u.equip || {}), [item.kind]: item.id } } : u));
+  };
+  const toggleEquip = (item) => {
+    const cur = (me.equip || {})[item.kind];
+    const next = cur === item.id ? null : item.id;
+    setUsers(users.map((u) => u.id === me.id ? { ...u, equip: { ...(u.equip || {}), [item.kind]: next } } : u));
+  };
 
   const h2h = !other ? null
     : stats.daysWon === stats.daysLost ? `Even with ${other.name}, ${stats.daysWon} each`
@@ -66,7 +79,7 @@ export function ProfileTab({ users, me, setUsers, onLogout, dark, setDark, notif
       <PageHead title="Profile" subtitle="Your record, all time." />
 
       <div className="profile-switch">
-        {users.map((u) => (
+        {users.filter((u) => !u.hidden || u.id === me.id).map((u) => (
           <button key={u.id} className={"profile-switch-btn " + (viewId === u.id ? "on" : "")} onClick={() => setViewId(u.id)}>
             <Avatar user={u} size={22} /> {u.id === me.id ? "You" : u.name}
           </button>
@@ -81,8 +94,9 @@ export function ProfileTab({ users, me, setUsers, onLogout, dark, setDark, notif
           )}
           <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { onPickImage(e.target.files[0]); e.target.value = ""; }} />
         </div>
-        <div className="profile-name">{viewed.name}</div>
+        <div className="profile-name" style={nameStyle(viewed) || undefined}>{viewed.name}</div>
         <div className="profile-rank" style={{ color: stats.rank.color, borderColor: stats.rank.color + "55" }}>{stats.rank.title}</div>
+        <div className="profile-balance"><Coins size={14} /> {balance.toLocaleString()} points to spend</div>
         {viewed.bio ? <div className="profile-bio">{viewed.bio}</div> : (isSelf && <div className="profile-bio muted-small">Add a motto in settings below.</div>)}
         {h2h && <div className="profile-h2h"><Swords size={14} /> {h2h}</div>}
       </Card>
@@ -103,6 +117,48 @@ export function ProfileTab({ users, me, setUsers, onLogout, dark, setDark, notif
           ? <div className="badge-row">{badges.map((a, i) => <span key={i} className="badge"><span className="badge-ic">{a.icon}</span>{a.t}</span>)}</div>
           : <p className="muted-small">No badges yet. Keep streaks alive, finish tasks, and win days to earn them.</p>}
       </Card>
+
+      {isSelf && (
+        <Card className="shop">
+          <div className="card-title"><Sparkles size={15} /> Shop</div>
+          <p className="muted-small" style={{ marginBottom: 6 }}>Spend points on cosmetics. This never touches your rank, only your spendable balance.</p>
+          <div className="shop-balance"><Coins size={16} /> {balance.toLocaleString()} points</div>
+          {["name", "deco"].map((kind) => {
+            const items = SHOP_ITEMS.filter((it) => it.kind === kind);
+            return (
+              <div key={kind} className="shop-group">
+                <div className="shop-group-title">{KIND_LABEL[kind]}</div>
+                {kind === "deco" && items.length === 0 && (
+                  <p className="muted-small">No decorations yet. Design PNGs and add them in src/lib/decorations.js to make them appear here.</p>
+                )}
+                <div className="shop-grid">
+                  {items.map((it) => {
+                    const have = owned.has(it.id);
+                    const on = equip[it.kind] === it.id;
+                    return (
+                      <div key={it.id} className={"shop-item " + (on ? "equipped" : "")}>
+                        <div className="shop-prev">
+                          {kind === "deco"
+                            ? <span className="shop-deco-prev"><Avatar user={me} size={34} /><img className="avatar-deco" src={decoSrc(it.file)} alt="" style={{ width: 46, height: 46, top: -6, left: -6 }} /></span>
+                            : <span className="shop-name-prev" style={{ background: it.css, WebkitBackgroundClip: "text", backgroundClip: "text", WebkitTextFillColor: "transparent", color: "transparent" }}>{me.name}</span>}
+                        </div>
+                        <div className="shop-name">{it.name}</div>
+                        {have ? (
+                          <button className={"shop-btn " + (on ? "on" : "")} onClick={() => toggleEquip(it)}>{on ? <><Check size={13} /> Equipped</> : "Equip"}</button>
+                        ) : (
+                          <button className="shop-btn buy" disabled={balance < it.cost} onClick={() => buy(it)}>
+                            {balance < it.cost ? <><Lock size={12} /> {it.cost}</> : <><Coins size={12} /> {it.cost}</>}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </Card>
+      )}
 
       {isSelf && <SelfSettings users={users} me={me} setUsers={setUsers} onLogout={onLogout} dark={dark} setDark={setDark} notifOn={notifOn} enableNotifs={enableNotifs} hasAvatar={!!me.avatar} />}
     </div>

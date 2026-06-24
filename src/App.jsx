@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { loadKey, saveKey, subscribeKey } from "./storage";
 import { firebaseConfigured } from "./firebase";
-import { Home, Repeat, CheckSquare, PiggyBank, CalendarDays, Clock, Receipt, User } from "lucide-react";
+import { Home, Repeat, CheckSquare, PiggyBank, CalendarDays, Clock, Receipt, User, Coins } from "lucide-react";
 
 import { GlobalStyle } from "./styles";
 import { Avatar, Modal, Btn, WideLogo, IconMark } from "./components/ui";
@@ -23,7 +23,9 @@ import { nextInvoiceDate } from "./lib/invoices";
 import { notify } from "./lib/notify";
 import { scheduleReminders } from "./lib/reminders";
 import { useFocusEngine } from "./lib/focus";
-import { uid } from "./lib/format";
+import { uid, hashPw } from "./lib/format";
+import { totalPoints } from "./lib/points";
+import { earnedBalance } from "./lib/shop";
 import { DEFAULT_USERS, DEFAULT_FINANCE } from "./lib/constants";
 
 const TABS = [
@@ -50,6 +52,8 @@ export default function App() {
   const [finance, setFinanceState] = useState(DEFAULT_FINANCE);
   const [focus, setFocusState] = useState([]);
   const [work, setWorkState] = useState([]);
+  const [updates, setUpdatesState] = useState([]);
+  const [meetings, setMeetingsState] = useState([]);
   const [schedules, setSchedulesState] = useState({});
 
   const [dark, setDark] = useState(() => { try { return localStorage.getItem("crica_theme") === "dark"; } catch (e) { return false; } });
@@ -68,6 +72,33 @@ export default function App() {
     if (!seconds || seconds <= 0) return;
     const rec = { id: uid(), userId, taskId, date: todayStr(), seconds, endedAt: Date.now() };
     setWorkState((prev) => { const next = [...(prev || []), rec]; saveKey("work", next); return next; });
+  }, []);
+
+  const logUpdate = useCallback(({ taskId, taskTitle, note, done }) => {
+    const rec = { id: uid(), userId: currentUserId, taskId, taskTitle, note: note || "", done: !!done, createdAt: Date.now() };
+    setUpdatesState((prev) => { const next = [...(prev || []), rec]; saveKey("updates", next); return next; });
+  }, [currentUserId]);
+  const editUpdate = useCallback((id, patch) => {
+    setUpdatesState((prev) => { const next = (prev || []).map((u) => u.id === id ? { ...u, ...patch, edited: true } : u); saveKey("updates", next); return next; });
+  }, []);
+  const deleteUpdate = useCallback((id) => {
+    setUpdatesState((prev) => { const next = (prev || []).filter((u) => u.id !== id); saveKey("updates", next); return next; });
+  }, []);
+
+  const proposeMeeting = useCallback(({ date, start, end, note }) => {
+    setUsersState((curUsers) => {
+      const other = (curUsers || []).find((u) => u.id !== currentUserId);
+      if (!other) return curUsers;
+      const rec = { id: uid(), fromId: currentUserId, toId: other.id, date, start, end, note: note || "", status: "pending", createdAt: Date.now() };
+      setMeetingsState((prev) => { const next = [...(prev || []), rec]; saveKey("meetings", next); return next; });
+      return curUsers;
+    });
+  }, [currentUserId]);
+  const respondMeeting = useCallback((id, status) => {
+    setMeetingsState((prev) => { const next = (prev || []).map((m) => m.id === id ? { ...m, status, respondedAt: Date.now(), seenByFrom: false } : m); saveKey("meetings", next); return next; });
+  }, []);
+  const dismissMeeting = useCallback((id) => {
+    setMeetingsState((prev) => { const next = (prev || []).map((m) => m.id === id ? { ...m, seenByFrom: true } : m); saveKey("meetings", next); return next; });
   }, []);
 
   const focusEngine = useFocusEngine({ onBank: bankFocus });
@@ -116,6 +147,8 @@ export default function App() {
       subscribeKey("finance", (f) => { if (f) setFinanceState(f); }),
       subscribeKey("focus", (f) => setFocusState(f || [])),
       subscribeKey("work", (w) => setWorkState(w || [])),
+      subscribeKey("updates", (u) => setUpdatesState(u || [])),
+      subscribeKey("meetings", (m) => setMeetingsState(m || [])),
       subscribeKey("schedules", (s) => setSchedulesState(s || {})),
     ];
     return () => unsubs.forEach((u) => { try { u && u(); } catch (e) { /* ignore */ } });
@@ -145,8 +178,11 @@ export default function App() {
   }, []);
 
   const setUsers = (u) => { setUsersState(u); saveKey("accounts", { users: u, setupComplete: true }); };
-  const setHabits = (h) => { setHabitsState(h); saveKey("habits", h); };
-  const setTasks = (t) => { setTasksState(t); saveKey("tasks", t); };
+  const markUpdatesSeen = useCallback(() => {
+    setUsersState((prev) => { const next = (prev || []).map((u) => u.id === currentUserId ? { ...u, lastSeenUpdates: Date.now() } : u); saveKey("accounts", { users: next, setupComplete: true }); return next; });
+  }, [currentUserId]);
+  const setHabits = (h) => setHabitsState((prev) => { const next = typeof h === "function" ? h(prev || []) : h; saveKey("habits", next); return next; });
+  const setTasks = (u) => setTasksState((prev) => { const next = typeof u === "function" ? u(prev || []) : u; saveKey("tasks", next); return next; });
   const setClients = (c) => { setClientsState(c); saveKey("clients", c); };
   const setFinance = (f) => { setFinanceState(f); saveKey("finance", f); };
   const setSchedules = (s) => { setSchedulesState(s); saveKey("schedules", s); };
@@ -156,6 +192,30 @@ export default function App() {
   const goHome = () => { setTab("dashboard"); setShowSettings(false); };
 
   const me = users?.find((u) => u.id === currentUserId);
+  const unreadUpdates = (updates || []).filter((u) => u.userId !== currentUserId && (u.createdAt || 0) > (me?.lastSeenUpdates || 0)).length;
+  const myBalance = me ? earnedBalance(totalPoints(me.id, habits, tasks, focus, work), me) : 0;
+
+  // Dev helper for testing the shop from the browser console: cricaDev.give(5000) / cricaDev.reset()
+  useEffect(() => {
+    if (typeof window === "undefined" || !me) return;
+    window.cricaDev = {
+      give: (n = 1000) => { setUsers(users.map((u) => u.id === currentUserId ? { ...u, spent: (u.spent || 0) - n } : u)); return `Added ${n} test points. Balance now about ${myBalance + n}.`; },
+      reset: () => { setUsers(users.map((u) => u.id === currentUserId ? { ...u, spent: 0, owned: [], equip: {} } : u)); return "Reset done: purchases cleared and balance back to your real earned points."; },
+      balance: () => myBalance,
+      loginAs: (id) => { loginAs(id); return `Switched to ${id}. Reloading view.`; },
+      logout: () => { logout(); return "Logged out."; },
+      who: () => currentUserId,
+    };
+  }, [users, currentUserId, me, myBalance]);
+
+  // One-time: make sure a hidden test account exists, so you can log in from the other side.
+  const testerAddedRef = useRef(false);
+  useEffect(() => {
+    if (testerAddedRef.current || !users || users.length === 0) return;
+    if (users.some((u) => u.id === "tester")) { testerAddedRef.current = true; return; }
+    testerAddedRef.current = true;
+    setUsers([...users, { id: "tester", name: "Tester", color: "#8E8E93", pw: hashPw("test"), hidden: true }]);
+  }, [users]);
 
   // Alerts shown in the bar, only when something is due soon
   const alerts = useMemo(() => {
@@ -231,11 +291,11 @@ export default function App() {
   const renderTab = () => {
     if (showSettings) return <ProfileTab users={users} me={me} setUsers={setUsers} onLogout={logout} dark={dark} setDark={setDark} notifOn={notifOn} enableNotifs={enableNotifs} habits={habits} tasks={tasks} focus={focus} work={work} />;
     switch (tab) {
-      case "dashboard": return <Dashboard users={users} me={me} habits={habits} tasks={tasks} finance={finance} focus={focus} />;
+      case "dashboard": return <Dashboard users={users} me={me} habits={habits} tasks={tasks} finance={finance} focus={focus} work={work} />;
       case "habits": return <HabitsTab users={users} me={me} habits={habits} setHabits={setHabits} />;
-      case "tasks": return <TasksTab users={users} me={me} tasks={tasks} setTasks={setTasks} clients={clients} board={tasksBoard} setBoard={setTasksBoard} onWorkStart={() => pip.openPip()} onWorkEnd={logWork} />;
+      case "tasks": return <TasksTab users={users} me={me} tasks={tasks} setTasks={setTasks} clients={clients} board={tasksBoard} setBoard={setTasksBoard} onWorkStart={() => pip.openPip()} onWorkEnd={logWork} updates={updates} onUpdate={logUpdate} onEditUpdate={editUpdate} onDeleteUpdate={deleteUpdate} onSeenUpdates={markUpdatesSeen} unreadUpdates={unreadUpdates} />;
       case "vault": return <CompanyTab finance={finance} setFinance={setFinance} clients={clients} setClients={setClients} />;
-      case "report": return <DailyReport users={users} me={me} habits={habits} tasks={tasks} focus={focus} schedules={schedules} setSchedules={setSchedules} />;
+      case "report": return <DailyReport users={users} me={me} habits={habits} tasks={tasks} focus={focus} work={work} schedules={schedules} setSchedules={setSchedules} meetings={meetings} onPropose={proposeMeeting} />;
       default: return null;
     }
   };
@@ -250,13 +310,16 @@ export default function App() {
             <nav className="top-nav">
               {TABS.map((tb) => (
                 <button key={tb.id} className={"top-nav-item " + (!showSettings && tab === tb.id ? "on" : "")} onClick={() => { setTab(tb.id); setShowSettings(false); }}>
-                  <tb.icon size={16} /> {tb.label}
+                  <span className="nav-ic-wrap"><tb.icon size={16} />{tb.id === "tasks" && unreadUpdates > 0 && <span className="nav-badge">{unreadUpdates}</span>}</span> {tb.label}
                 </button>
               ))}
             </nav>
-            <button className="header-me" onClick={() => setShowSettings(true)}><Avatar user={me} size={30} /></button>
+            <button className="header-me" onClick={() => setShowSettings(true)}>
+              <span className="coin-pill" title="Points you can spend in the shop"><Coins size={13} /> {myBalance.toLocaleString()}</span>
+              <Avatar user={me} size={30} />
+            </button>
           </header>
-          <AlertBar alerts={alerts} openCount={openCount} onOpen={() => { setTasksBoard("pool"); setShowSettings(false); setTab("tasks"); }} />
+          <AlertBar alerts={alerts} openCount={openCount} onOpen={() => { setTasksBoard("pool"); setShowSettings(false); setTab("tasks"); }} meetings={meetings} users={users} me={me} onRespondMeeting={respondMeeting} onDismissMeeting={dismissMeeting} />
         </div>
 
         <main className="app-main">{renderTab()}</main>
@@ -264,7 +327,7 @@ export default function App() {
         <nav className="bottom-nav">
           {TABS.map((tb) => (
             <button key={tb.id} className={"bottom-nav-item " + (!showSettings && tab === tb.id ? "on" : "")} onClick={() => { setTab(tb.id); setShowSettings(false); }}>
-              <tb.icon size={20} /><span>{tb.label}</span>
+              <span className="nav-ic-wrap"><tb.icon size={20} />{tb.id === "tasks" && unreadUpdates > 0 && <span className="nav-badge">{unreadUpdates}</span>}</span><span>{tb.label}</span>
             </button>
           ))}
           <button className={"bottom-nav-item " + (showSettings ? "on" : "")} onClick={() => setShowSettings(true)}>

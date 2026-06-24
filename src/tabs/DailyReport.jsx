@@ -5,7 +5,9 @@ import { pointsOnDay, focusSecondsInRange } from "../lib/points";
 import { addDays, todayStr, dateDiff, prettyDate } from "../lib/dates";
 import { Schedule } from "./Schedule";
 
-export function DailyReport({ users, me, habits, tasks, focus = [], schedules = {}, setSchedules }) {
+import { nameStyle } from "../lib/shop";
+export function DailyReport({ users: allUsers, me, habits, tasks, focus = [], work = [], schedules = {}, setSchedules, meetings = [], onPropose }) {
+  const users = (allUsers || []).filter((u) => !u.hidden || u.id === me.id);
   const [day, setDay] = useState(addDays(todayStr(), -1));
   const isYesterday = day === addDays(todayStr(), -1);
   const canForward = dateDiff(todayStr(), day) > 0;
@@ -14,7 +16,7 @@ export function DailyReport({ users, me, habits, tasks, focus = [], schedules = 
     const tasksDone = tasks.filter((t) => !t.parentId && (t.completed || {})[u.id] === day);
     const habitsDone = habits.filter((h) => h.ownerId === u.id && (h.completions || {})[day]);
     const focusMin = Math.round(focusSecondsInRange(u.id, day, day, focus) / 60);
-    const pts = pointsOnDay(u.id, day, habits, tasks, focus);
+    const pts = pointsOnDay(u.id, day, habits, tasks, focus, work);
     return { user: u, tasksDone, habitsDone, focusMin, pts };
   });
   const winner = data[0].pts === data[1].pts ? null : (data[0].pts > data[1].pts ? 0 : 1);
@@ -31,13 +33,13 @@ export function DailyReport({ users, me, habits, tasks, focus = [], schedules = 
       <Card className="report-banner">
         <CalendarDays size={18} />
         <span>{prettyDate(day)}</span>
-        {winner !== null ? <span className="report-winner"><Crown size={15} /> {data[winner].user.name} won the day</span> : <span className="report-winner">Even day</span>}
+        {winner !== null ? <span className="report-winner"><Crown size={15} /> <span style={nameStyle(data[winner].user) || undefined}>{data[winner].user.name}</span> won the day</span> : <span className="report-winner">Even day</span>}
       </Card>
 
       <div className="report-grid">
         {data.map((d, i) => (
           <Card key={d.user.id} className={"report-col " + (winner === i ? "report-win" : "")}>
-            <div className="report-user"><Avatar user={d.user} size={36} /><span>{d.user.name}</span></div>
+            <div className="report-user"><Avatar user={d.user} size={36} /><span style={nameStyle(d.user) || undefined}>{d.user.name}</span></div>
             <div className="report-big" style={{ color: d.user.color }}>{d.pts}<span>pts</span></div>
             <div className="report-line"><CheckSquare size={14} /> {d.tasksDone.length} task{d.tasksDone.length === 1 ? "" : "s"} done</div>
             <div className="report-line"><Repeat size={14} /> {d.habitsDone.length} habit{d.habitsDone.length === 1 ? "" : "s"} kept</div>
@@ -53,7 +55,7 @@ export function DailyReport({ users, me, habits, tasks, focus = [], schedules = 
       </div>
 
       <div className="settings-divider">Availability</div>
-      <Schedule users={users} me={me} schedules={schedules} setSchedules={setSchedules} />
+      <Schedule users={users} me={me} schedules={schedules} setSchedules={setSchedules} meetings={meetings} onPropose={onPropose} />
     </div>
   );
 }

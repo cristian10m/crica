@@ -1,15 +1,20 @@
-import { useState } from "react";
-import { ChevronLeft, ChevronRight, Plus, Trash2, Briefcase, Ban, Users, Check, Copy } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ChevronLeft, ChevronRight, Plus, Trash2, Briefcase, Ban, Users, Check, Copy, CalendarPlus, Clock } from "lucide-react";
 import { Card, Btn, IconBtn, Field, Modal, Avatar } from "../components/ui";
 import { weekDates, todayStr, addDays, parseDate, prettyDate, MONTHS } from "../lib/dates";
 import { uid } from "../lib/format";
 import {
-  DAY_KEYS, DAY_LABELS, DAY_SHORT, busyFor, freeTogether, pct, fmtRange, weekdayKey, toMin,
+  DAY_KEYS, DAY_LABELS, DAY_SHORT, busyFor, freeTogether, pct, fmtRange, fmtMin, weekdayKey, toMin,
 } from "../lib/schedule";
 
-export function Schedule({ users, me, schedules, setSchedules }) {
+const minToHHMM = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+
+export function Schedule({ users: allUsers, me, schedules, setSchedules, meetings = [], onPropose }) {
+  const users = (allUsers || []).filter((u) => !u.hidden || u.id === me.id);
   const [anchor, setAnchor] = useState(todayStr());
   const [excOpen, setExcOpen] = useState(false);
+  const [proposeFor, setProposeFor] = useState(null); // { date, start, end }
+  const other = users.find((u) => u.id !== me.id);
   const week = weekDates(anchor);
   const weekStart = week[0];
   const mySched = schedules[me.id] || {};
@@ -66,6 +71,7 @@ export function Schedule({ users, me, schedules, setSchedules }) {
         const busies = users.map((u) => busyFor(schedules[u.id], date));
         const free = freeTogether(busies);
         const dd = parseDate(date);
+        const dayMeetings = (meetings || []).filter((m) => m.date === date && m.status !== "declined");
         return (
           <Card key={date} className={"sched-day " + (isToday ? "sched-today" : "")}>
             <div className="sched-day-head">
@@ -95,6 +101,21 @@ export function Schedule({ users, me, schedules, setSchedules }) {
                 </div>
               </div>
             </div>
+            {dayMeetings.map((m) => {
+              const fromMe = m.fromId === me.id;
+              const who = fromMe ? (other ? other.name : "them") : (users.find((u) => u.id === m.fromId)?.name || "them");
+              return (
+                <div key={m.id} className={"sched-meeting " + m.status}>
+                  <Clock size={13} /> {fmtRange(toMin(m.start), toMin(m.end))}
+                  <span className="sched-meeting-status">{m.status === "accepted" ? "confirmed" : fromMe ? `sent to ${who}` : `${who} proposed`}</span>
+                </div>
+              );
+            })}
+            {free.length > 0 && onPropose && other && (
+              <button className="sched-propose" onClick={() => setProposeFor({ date, start: minToHHMM(free[0][0]), end: minToHHMM(Math.min(free[0][1], free[0][0] + 60)) })}>
+                <CalendarPlus size={14} /> Propose a meeting
+              </button>
+            )}
           </Card>
         );
       })}
@@ -144,7 +165,30 @@ export function Schedule({ users, me, schedules, setSchedules }) {
       </Card>
 
       <ExceptionModal open={excOpen} onClose={() => setExcOpen(false)} onAdd={addException} />
+      <ProposeModal open={proposeFor !== null} init={proposeFor} other={other}
+        onClose={() => setProposeFor(null)}
+        onSend={(data) => { if (onPropose) onPropose(data); setProposeFor(null); }} />
     </div>
+  );
+}
+
+function ProposeModal({ open, init, other, onClose, onSend }) {
+  const [start, setStart] = useState("18:00");
+  const [end, setEnd] = useState("19:00");
+  const [note, setNote] = useState("");
+  useEffect(() => { if (open) { setStart(init?.start || "18:00"); setEnd(init?.end || "19:00"); setNote(""); } }, [open, init]);
+  return (
+    <Modal open={open} onClose={onClose} title="Propose a meeting">
+      {init && <p className="muted-small" style={{ marginBottom: 12 }}>{prettyDate(init.date)}, sent to {other ? other.name : "your partner"} to accept.</p>}
+      <div className="rota-times">
+        <span className="field-label" style={{ margin: 0 }}>From</span>
+        <input type="time" value={start} onChange={(e) => setStart(e.target.value)} />
+        <span>to</span>
+        <input type="time" value={end} onChange={(e) => setEnd(e.target.value)} />
+      </div>
+      <Field label="Note (optional)"><input value={note} onChange={(e) => setNote(e.target.value)} placeholder="What's it about?" maxLength={80} /></Field>
+      <div className="modal-actions"><Btn onClick={() => onSend({ date: init.date, start, end, note: note.trim() })}><Check size={16} /> Send request</Btn></div>
+    </Modal>
   );
 }
 
