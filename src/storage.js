@@ -31,8 +31,26 @@ export async function loadKey(key, fallback) {
   return fallback;
 }
 
+// Firebase Realtime Database rejects any value containing `undefined` and fails
+// the whole write. That silently lost task completions (a non-recurring task gets
+// spawnedNext: undefined), which then reverted on refresh. Strip undefined first.
+function clean(v) {
+  if (Array.isArray(v)) return v.map(clean);
+  if (v && typeof v === "object") {
+    const out = {};
+    for (const k in v) { if (v[k] !== undefined) out[k] = clean(v[k]); }
+    return out;
+  }
+  return v;
+}
+
 export async function saveKey(key, data) {
-  await set(ref(db, ROOT + "/" + key), data);
+  try {
+    await set(ref(db, ROOT + "/" + key), clean(data));
+  } catch (e) {
+    console.error("[Crica] saveKey failed for", key, e);
+    throw e;
+  }
 }
 
 export function subscribeKey(key, cb) {
