@@ -3,7 +3,7 @@ import {
   BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid,
 } from "recharts";
 import {
-  CheckSquare, Flame, TrendingUp, PiggyBank, ChevronLeft, ChevronRight, Crown, Star, Award, Zap, Trophy, Timer,
+  CheckSquare, Flame, TrendingUp, PiggyBank, ChevronLeft, ChevronRight, Crown, Star, Award, Zap, Trophy, Timer, Briefcase,
 } from "lucide-react";
 import { Card, IconBtn, Avatar, Ring, PageHead } from "../components/ui";
 import { useCountUp } from "../lib/hooks";
@@ -63,6 +63,13 @@ export function Dashboard({ users: allUsers, me, habits, tasks, finance, focus =
 
   const splitData = users.map((u, i) => ({ name: u.name, value: Math.max(weekPoints[i], 0.001), color: u.color }));
 
+  // Hours worked this week, per person and per day, from the work timer records.
+  const fmtHrs = (sec) => { const m = Math.round(sec / 60); return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`; };
+  const weekWorked = users.map((u) => (work || []).filter((w) => w.userId === u.id && w.date >= weekFrom && w.date <= weekTo).reduce((s, w) => s + (w.seconds || 0), 0));
+  const dailyWorked = users.map((u) => week.map((d) => (work || []).filter((w) => w.userId === u.id && w.date === d).reduce((s, w) => s + (w.seconds || 0), 0)));
+  const maxWeekWorked = Math.max(1, ...weekWorked);
+  const maxDayWorked = Math.max(1, ...dailyWorked.flat());
+
   const achievements = useMemo(() => {
     const list = [];
     if (bestStreak >= 7) list.push({ icon: <Flame size={16} />, t: "7 day streak" });
@@ -109,6 +116,34 @@ export function Dashboard({ users: allUsers, me, habits, tasks, finance, focus =
         <StatTile icon={<Timer size={18} />} label="Your focus this week" value={(() => { const m = Math.round(myFocusSecWeek / 60); return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`; })()} accent="#AF52DE" />
         <StatTile icon={<PiggyBank size={18} />} label="Income this month" value={fmtMoney(monthIncome)} accent="#34C759" />
       </div>
+
+      <Card className="hours-card">
+        <div className="card-title"><Briefcase size={15} /> Hours worked this week</div>
+        <div className="hours-rows">
+          {users.map((u, i) => (
+            <div className="hours-row" key={u.id}>
+              <Avatar user={u} size={26} />
+              <div className="hours-bar-track">
+                <div className="hours-bar-fill" style={{ width: `${(weekWorked[i] / maxWeekWorked) * 100}%`, background: u.color }} />
+              </div>
+              <span className="hours-val">{fmtHrs(weekWorked[i])}</span>
+            </div>
+          ))}
+        </div>
+        <div className="hours-days">
+          {week.map((d, di) => (
+            <div className="hours-day" key={d}>
+              <div className="hours-day-bars">
+                {users.map((u, i) => (
+                  <div key={u.id} className="hours-day-bar" title={`${u.name}: ${fmtHrs(dailyWorked[i][di])}`}
+                    style={{ height: `${Math.max(dailyWorked[i][di] > 0 ? 6 : 0, (dailyWorked[i][di] / maxDayWorked) * 100)}%`, background: u.color }} />
+                ))}
+              </div>
+              <span className="hours-day-lab">{WEEKDAY[parseDate(d).getDay()][0]}</span>
+            </div>
+          ))}
+        </div>
+      </Card>
 
       <Card>
         <div className="card-title">Points per day</div>

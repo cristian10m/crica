@@ -89,6 +89,19 @@ export function GlobalStyle() {
 
     /* Cards */
     b, strong { font-weight: 500; }
+    .focus-ring-wrap.is-over .focus-ring-fill { stroke: #34C759; }
+    .focus-ring-wrap.is-over .focus-time { color: #34C759; }
+    /* Hours worked this week */
+    .hours-rows { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+    .hours-row { display: flex; align-items: center; gap: 11px; }
+    .hours-bar-track { flex: 1; height: 18px; border-radius: 999px; background: var(--line-2); overflow: hidden; }
+    .hours-bar-fill { height: 100%; border-radius: 999px; min-width: 4px; transition: width .6s cubic-bezier(.2,.8,.2,1); }
+    .hours-val { font-size: 14px; font-weight: 500; color: var(--ink); min-width: 56px; text-align: right; font-variant-numeric: tabular-nums; }
+    .hours-days { display: flex; gap: 6px; padding-top: 14px; border-top: 1px solid var(--line-2); }
+    .hours-day { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .hours-day-bars { display: flex; align-items: flex-end; justify-content: center; gap: 3px; height: 54px; width: 100%; }
+    .hours-day-bar { width: 7px; border-radius: 4px 4px 2px 2px; min-height: 0; transition: height .5s cubic-bezier(.2,.8,.2,1); }
+    .hours-day-lab { font-size: 11px; color: var(--ink-3); }
     /* Avatar cosmetics */
     .avatar-wrap { position: relative; display: inline-grid; place-items: center; vertical-align: middle; }
     .avatar-deco { position: absolute; pointer-events: none; object-fit: contain; }

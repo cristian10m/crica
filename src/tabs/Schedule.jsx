@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight, Plus, Trash2, Briefcase, Ban, Users, Check, Copy, CalendarPlus, Clock } from "lucide-react";
 import { Card, Btn, IconBtn, Field, Modal, Avatar } from "../components/ui";
-import { weekDates, todayStr, addDays, parseDate, prettyDate, MONTHS } from "../lib/dates";
+import { weekDates, todayStr, addDays, parseDate, prettyDate, MONTHS, tzOffsetMin, localTz } from "../lib/dates";
 import { uid } from "../lib/format";
 import {
-  DAY_KEYS, DAY_LABELS, DAY_SHORT, busyFor, freeTogether, pct, fmtRange, fmtMin, weekdayKey, toMin,
+  DAY_KEYS, DAY_LABELS, DAY_SHORT, busyFor, freeTogether, pct, fmtRange, fmtMin, weekdayKey, toMin, shiftIntervals,
 } from "../lib/schedule";
 
 const minToHHMM = (m) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
@@ -48,7 +48,7 @@ export function Schedule({ users: allUsers, me, schedules, setSchedules, meeting
 
   return (
     <div>
-      <div className="sched-intro"><Users size={15} /> Green is when you are both free to call and work together. Each week has its own shifts, set yours below.</div>
+      <div className="sched-intro"><Users size={15} /> Green is when you are both free to call and work together, shown in your own local time. Each week has its own shifts, set yours below.</div>
 
       <div className="sched-week-head">
         <IconBtn onClick={() => setAnchor(addDays(anchor, -7))}><ChevronLeft size={18} /></IconBtn>
@@ -68,9 +68,15 @@ export function Schedule({ users: allUsers, me, schedules, setSchedules, meeting
 
       {week.map((date) => {
         const isToday = date === todayStr();
-        const busies = users.map((u) => busyFor(schedules[u.id], date));
+        const noon = parseDate(date); noon.setHours(12, 0, 0, 0);
+        const viewerTz = me.tz || localTz();
+        const viewerOff = tzOffsetMin(viewerTz, noon);
+        const offFor = (u) => tzOffsetMin(u.tz || viewerTz, noon);
+        const busies = users.map((u) => shiftIntervals(busyFor(schedules[u.id], date), viewerOff - offFor(u)));
         const free = freeTogether(busies);
         const dd = parseDate(date);
+        const userById = (id) => users.find((u) => u.id === id);
+        const meetMin = (hhmm, fromId) => { const m = toMin(hhmm); const fu = userById(fromId); return m == null ? null : m + (viewerOff - (fu ? offFor(fu) : viewerOff)); };
         const dayMeetings = (meetings || []).filter((m) => m.date === date && m.status !== "declined");
         return (
           <Card key={date} className={"sched-day " + (isToday ? "sched-today" : "")}>
@@ -103,10 +109,11 @@ export function Schedule({ users: allUsers, me, schedules, setSchedules, meeting
             </div>
             {dayMeetings.map((m) => {
               const fromMe = m.fromId === me.id;
-              const who = fromMe ? (other ? other.name : "them") : (users.find((u) => u.id === m.fromId)?.name || "them");
+              const who = fromMe ? (other ? other.name : "them") : (userById(m.fromId)?.name || "them");
+              const ms = meetMin(m.start, m.fromId), meEnd = meetMin(m.end, m.fromId);
               return (
                 <div key={m.id} className={"sched-meeting " + m.status}>
-                  <Clock size={13} /> {fmtRange(toMin(m.start), toMin(m.end))}
+                  <Clock size={13} /> {ms != null && meEnd != null ? fmtRange(ms, meEnd) : `${m.start} to ${m.end}`}
                   <span className="sched-meeting-status">{m.status === "accepted" ? "confirmed" : fromMe ? `sent to ${who}` : `${who} proposed`}</span>
                 </div>
               );

@@ -51,6 +51,7 @@ export function FocusOverlay({ open, onClose, engine, onStart }) {
   const focused = session?.focusedMs || 0;
   const progress = target ? Math.min(1, focused / target) : 0;
   const remaining = target - focused;
+  const over = remaining <= 0;
   const toNext = POINT_INTERVAL_MS - (focused % POINT_INTERVAL_MS);
 
   const size = 264, stroke = 14, r = (size - stroke) / 2, circ = 2 * Math.PI * r;
@@ -63,7 +64,7 @@ export function FocusOverlay({ open, onClose, engine, onStart }) {
         <div className="focus-setup">
           <div className="focus-kicker"><Sparkles size={15} /> Focus</div>
           <h2 className="focus-h2">Lock in.</h2>
-          <p className="focus-sub">Earn {POINTS_PER_HOUR} points for every hour of focused work. The timer only counts while this stays open and in front of you.</p>
+          <p className="focus-sub">Earn {POINTS_PER_HOUR} points for every hour of focused work. The timer keeps counting even if you switch away or pop it out, and chimes when your time is up but carries on until you stop it.</p>
           <div className="focus-presets">
             {FOCUS_PRESETS.map((m) => (
               <button key={m} className="focus-preset" onClick={() => begin(m)}>
@@ -83,7 +84,7 @@ export function FocusOverlay({ open, onClose, engine, onStart }) {
 
       {session && phase !== "done" && (
         <div className="focus-live">
-          <div className={"focus-ring-wrap" + (phase === "running" ? " is-running" : "")}>
+          <div className={"focus-ring-wrap" + (phase === "running" ? " is-running" : "") + (over ? " is-over" : "")}>
             <svg width={size} height={size} className="focus-ring">
               <circle cx={size / 2} cy={size / 2} r={r} className="focus-ring-track" strokeWidth={stroke} fill="none" />
               <circle cx={size / 2} cy={size / 2} r={r} className="focus-ring-fill" strokeWidth={stroke} fill="none"
@@ -91,8 +92,8 @@ export function FocusOverlay({ open, onClose, engine, onStart }) {
                 transform={`rotate(-90 ${size / 2} ${size / 2})`} />
             </svg>
             <div className="focus-center">
-              <div className="focus-time">{fmtClock(remaining)}</div>
-              <div className="focus-state">{phase === "paused" ? "Paused" : "left to focus"}</div>
+              <div className="focus-time">{over ? `+${fmtClock(focused - target)}` : fmtClock(remaining)}</div>
+              <div className="focus-state">{phase === "paused" ? "Paused" : over ? "overtime, still counting" : "left to focus"}</div>
             </div>
           </div>
 
@@ -100,13 +101,13 @@ export function FocusOverlay({ open, onClose, engine, onStart }) {
             <span key={pts} className="focus-pts-big">+{pts}</span>
             <span className="focus-pts-lab">points earned</span>
           </div>
-          <div className="focus-next">Next point in {fmtClock(toNext)}</div>
+          <div className="focus-next">{over ? "Time is up, keep going as long as you like" : `Next point in ${fmtClock(toNext)}`}</div>
 
           <div className="focus-controls">
             {phase === "running"
               ? <Btn variant="ghost" onClick={pause}><Pause size={16} /> Pause</Btn>
               : <Btn variant="primary" onClick={resume}><Play size={16} /> Resume</Btn>}
-            <Btn variant="ghost-danger" onClick={end}><Square size={16} /> End session</Btn>
+            <Btn variant="ghost-danger" onClick={end}><Square size={16} /> {over ? "Stop and bank" : "End session"}</Btn>
           </div>
         </div>
       )}

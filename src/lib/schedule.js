@@ -78,3 +78,13 @@ export function freeTogether(busyLists) {
 
 export const pct = (min) => ((min - WINDOW_START) / WINDOW_LEN) * 100;
 export const fmtRange = (s, e) => `${fmtMin(s)} to ${fmtMin(e)}`;
+
+// Shift busy intervals by `delta` minutes (to move one person's local times into
+// the viewer's local frame), then keep only what stays inside the day window.
+export function shiftIntervals(intervals, delta) {
+  if (!delta) return intervals;
+  return intervals
+    .map(([s, e]) => [s + delta, e + delta])
+    .map(([s, e]) => [Math.max(WINDOW_START, s), Math.min(WINDOW_END, e)])
+    .filter(([s, e]) => e > s);
+}

@@ -8,6 +8,7 @@ import { Avatar, Modal, Btn, WideLogo, IconMark } from "./components/ui";
 import { AlertBar } from "./components/AlertBar";
 import { FocusFab, FocusOverlay } from "./components/Focus";
 import { usePipWindow, PipMini } from "./components/PipMini";
+import { StopModal } from "./components/StopModal";
 import { createPortal } from "react-dom";
 import { LoginScreen } from "./screens/LoginScreen";
 import { DbErrorScreen } from "./screens/DbErrorScreen";
@@ -18,7 +19,7 @@ import { CompanyTab } from "./tabs/CompanyTab";
 import { DailyReport } from "./tabs/DailyReport";
 import { ProfileTab } from "./tabs/ProfileTab";
 
-import { todayStr, dateDiff } from "./lib/dates";
+import { todayStr, dateDiff, localTz, parseDate, toDateStr } from "./lib/dates";
 import { nextInvoiceDate } from "./lib/invoices";
 import { notify } from "./lib/notify";
 import { scheduleReminders } from "./lib/reminders";
@@ -112,6 +113,45 @@ export default function App() {
     });
     saveKey("tasks", next); return next;
   });
+
+  // Stopping from the popup opens the same "what did you get done" prompt as the list.
+  const [stopPromptTask, setStopPromptTask] = useState(null);
+  const promptStopWork = () => {
+    const t = (tasks || []).find((x) => x.working && x.working[currentUserId] != null);
+    if (t) { setStopPromptTask(t); try { window.focus(); } catch (e) { /* ignore */ } }
+  };
+  const advanceRepeat = (dateStr, repeat) => {
+    const d = parseDate(dateStr || todayStr());
+    if (repeat === "daily") d.setDate(d.getDate() + 1);
+    else if (repeat === "weekly") d.setDate(d.getDate() + 7);
+    else if (repeat === "monthly") d.setMonth(d.getMonth() + 1);
+    return toDateStr(d);
+  };
+  const finishMyStop = (task, { note = "", markDone = false, post = false }) => {
+    const startMs = (task.working || {})[currentUserId];
+    const secs = startMs != null ? Math.round((Date.now() - startMs) / 1000) : 0;
+    if (secs > 0) logWork({ userId: currentUserId, taskId: task.id, seconds: secs });
+    const alreadyDone = !!(task.completed || {})[currentUserId];
+    const willDone = markDone && !alreadyDone;
+    setTasks((prev) => {
+      const cur = prev.find((t) => t.id === task.id) || task;
+      let spawnedNext = cur.spawnedNext; let nextInstance = null;
+      if (willDone && cur.repeat && !cur.spawnedNext) {
+        spawnedNext = true;
+        nextInstance = { ...cur, id: uid(), completed: {}, working: {}, spawnedNext: false, createdDate: todayStr(), dueDate: cur.dueDate ? advanceRepeat(cur.dueDate, cur.repeat) : null, order: prev.length + 1 };
+      }
+      let next = prev.map((t) => {
+        if (t.id !== cur.id) return t;
+        const w = { ...(t.working || {}) }; delete w[currentUserId];
+        const comp = { ...(t.completed || {}) }; if (willDone) comp[currentUserId] = todayStr();
+        return { ...t, working: w, completed: comp, spawnedNext };
+      });
+      if (nextInstance) next = [...next, nextInstance];
+      return next;
+    });
+    if (post) logUpdate({ taskId: task.id, taskTitle: task.title, note, done: willDone || alreadyDone });
+    setStopPromptTask(null);
+  };
 
   // Bootstrap: require Firebase. If it is missing or unreachable, fail loudly.
   useEffect(() => {
@@ -216,6 +256,15 @@ export default function App() {
     testerAddedRef.current = true;
     setUsers([...users, { id: "tester", name: "Tester", color: "#8E8E93", pw: hashPw("test"), hidden: true }]);
   }, [users]);
+
+  // Keep my timezone on record so the other person sees my schedule in their own local time.
+  useEffect(() => {
+    if (!me) return;
+    const tz = localTz();
+    if (tz && me.tz !== tz) {
+      setUsersState((prev) => { const next = (prev || []).map((u) => u.id === currentUserId ? { ...u, tz } : u); saveKey("accounts", { users: next, setupComplete: true }); return next; });
+    }
+  }, [me?.id, me?.tz, currentUserId]);
 
   // Alerts shown in the bar, only when something is due soon
   const alerts = useMemo(() => {
@@ -346,7 +395,7 @@ export default function App() {
           workingTitle={myWorkingTask ? myWorkingTask.title : ""}
           workingStart={myWorkingTask ? myWorkingTask.working[currentUserId] : null}
           onPause={focusEngine.pause} onResume={focusEngine.resume} onEnd={focusEngine.end}
-          onStopWork={stopMyWork}
+          onStopWork={promptStopWork}
         />, pip.pipWindow.document.body)}
 
       <Modal open={dailyPrompt} onClose={() => dismissDaily(false)} title={`Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, ${me?.name || ""}`}>
@@ -358,6 +407,11 @@ export default function App() {
           <Btn variant="primary" onClick={() => dismissDaily(true)}><CalendarDays size={16} /> Open report</Btn>
         </div>
       </Modal>
+
+      <StopModal open={stopPromptTask !== null} task={stopPromptTask} me={me || { id: currentUserId }}
+        onClose={() => setStopPromptTask(null)}
+        onPost={(note, markDone) => finishMyStop(stopPromptTask, { note, markDone, post: true })}
+        onSkip={() => finishMyStop(stopPromptTask, { post: false })} />
     </>
   );
 }

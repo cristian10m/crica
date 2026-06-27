@@ -85,8 +85,8 @@ export function PipMini({ focus, workingTitle, workingStart, onPause, onResume, 
       )}
       {focusActive ? (
         <div className="pip-main">
-          <div className="pip-time pip-accent">{fmtClock(focus.targetMs - focus.focusedMs)}</div>
-          <div className="pip-sub">+{earnedPoints(focus.focusedMs)} pts · {running ? "focusing" : "paused"}</div>
+          <div className="pip-time pip-accent">{focus.focusedMs >= focus.targetMs ? `+${fmtClock(focus.focusedMs - focus.targetMs)}` : fmtClock(focus.targetMs - focus.focusedMs)}</div>
+          <div className="pip-sub">+{earnedPoints(focus.focusedMs)} pts · {focus.focusedMs >= focus.targetMs ? "overtime" : running ? "focusing" : "paused"}</div>
           <div className="pip-controls">
             {running
               ? <button className="pip-btn" onClick={onPause}><Pause size={14} /> Pause</button>
