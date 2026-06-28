@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { loadKey, saveKey, subscribeKey } from "./storage";
 import { firebaseConfigured } from "./firebase";
-import { Home, Repeat, CheckSquare, PiggyBank, CalendarDays, Clock, Receipt, User, Coins } from "lucide-react";
+import { Home, Repeat, CheckSquare, PiggyBank, CalendarDays, Clock, Receipt, User, Coins, FileText } from "lucide-react";
 
 import { GlobalStyle } from "./styles";
 import { Avatar, Modal, Btn, WideLogo, IconMark } from "./components/ui";
@@ -18,6 +18,7 @@ import { TasksTab } from "./tabs/TasksTab";
 import { CompanyTab } from "./tabs/CompanyTab";
 import { DailyReport } from "./tabs/DailyReport";
 import { ProfileTab } from "./tabs/ProfileTab";
+import { DocsTab } from "./tabs/DocsTab";
 
 import { todayStr, dateDiff, localTz, parseDate, toDateStr } from "./lib/dates";
 import { nextInvoiceDate } from "./lib/invoices";
@@ -35,6 +36,7 @@ const TABS = [
   { id: "tasks", label: "Tasks", icon: CheckSquare },
   { id: "vault", label: "Company", icon: PiggyBank },
   { id: "report", label: "Report", icon: CalendarDays },
+  { id: "docs", label: "Docs", icon: FileText },
 ];
 
 const readView = () => { try { return localStorage.getItem("crica_view") || "dashboard"; } catch (e) { return "dashboard"; } };
@@ -49,6 +51,7 @@ export default function App() {
 
   const [habits, setHabitsState] = useState([]);
   const [tasks, setTasksState] = useState([]);
+  const [docs, setDocsState] = useState([]);
   const [clients, setClientsState] = useState([]);
   const [finance, setFinanceState] = useState(DEFAULT_FINANCE);
   const [focus, setFocusState] = useState([]);
@@ -183,6 +186,7 @@ export default function App() {
       subscribeKey("accounts", (acc) => { if (acc && acc.users) setUsersState(acc.users); }),
       subscribeKey("habits", (h) => setHabitsState(h || [])),
       subscribeKey("tasks", (t) => setTasksState(t || [])),
+      subscribeKey("docs", (d) => setDocsState(d || [])),
       subscribeKey("clients", (c) => setClientsState(c || [])),
       subscribeKey("finance", (f) => { if (f) setFinanceState(f); }),
       subscribeKey("focus", (f) => setFocusState(f || [])),
@@ -223,6 +227,7 @@ export default function App() {
   }, [currentUserId]);
   const setHabits = (h) => setHabitsState((prev) => { const next = typeof h === "function" ? h(prev || []) : h; saveKey("habits", next); return next; });
   const setTasks = (u) => setTasksState((prev) => { const next = typeof u === "function" ? u(prev || []) : u; saveKey("tasks", next); return next; });
+  const setDocs = (u) => setDocsState((prev) => { const next = typeof u === "function" ? u(prev || []) : u; saveKey("docs", next); return next; });
   const setClients = (c) => { setClientsState(c); saveKey("clients", c); };
   const setFinance = (f) => { setFinanceState(f); saveKey("finance", f); };
   const setSchedules = (s) => { setSchedulesState(s); saveKey("schedules", s); };
@@ -345,6 +350,7 @@ export default function App() {
       case "tasks": return <TasksTab users={users} me={me} tasks={tasks} setTasks={setTasks} clients={clients} board={tasksBoard} setBoard={setTasksBoard} onWorkStart={() => pip.openPip()} onWorkEnd={logWork} updates={updates} onUpdate={logUpdate} onEditUpdate={editUpdate} onDeleteUpdate={deleteUpdate} onSeenUpdates={markUpdatesSeen} unreadUpdates={unreadUpdates} />;
       case "vault": return <CompanyTab finance={finance} setFinance={setFinance} clients={clients} setClients={setClients} />;
       case "report": return <DailyReport users={users} me={me} habits={habits} tasks={tasks} focus={focus} work={work} schedules={schedules} setSchedules={setSchedules} meetings={meetings} onPropose={proposeMeeting} />;
+      case "docs": return <DocsTab docs={docs} setDocs={setDocs} me={me} users={users} />;
       default: return null;
     }
   };
