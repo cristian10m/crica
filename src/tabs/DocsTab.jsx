@@ -1,7 +1,21 @@
 import { useState, useRef, useEffect } from "react";
-import { FileText, Plus, Search, Trash2, ArrowLeft, Lock, Users, Share2, Bold, Italic, Underline, List, ListOrdered, Heading1, Heading2, Quote, Eraser } from "lucide-react";
+import { FileText, Plus, Search, Trash2, ArrowLeft, Lock, Users, Share2, Bold, Italic, Underline, List, ListOrdered, Heading1, Heading2, Quote, Eraser, Palette } from "lucide-react";
 import { Card, Btn, IconBtn, Avatar, PageHead } from "../components/ui";
 import { uid } from "../lib/format";
+
+// Strip colours, backgrounds and inline styles from pasted content so text always
+// follows the app theme instead of arriving as (often invisible) black on black.
+function sanitizeHtml(html) {
+  const d = document.createElement("div");
+  d.innerHTML = html || "";
+  d.querySelectorAll("style,script,meta,link,title,head").forEach((n) => n.remove());
+  d.querySelectorAll("*").forEach((el) => {
+    ["style", "color", "bgcolor", "face", "class", "id", "align", "width", "height"].forEach((a) => el.removeAttribute(a));
+    [...el.attributes].forEach((a) => { if (/^on/i.test(a.name) || a.name === "srcset") el.removeAttribute(a.name); });
+  });
+  return d.innerHTML;
+}
+const TEXT_COLORS = ["#ff3b30", "#ff9500", "#ffcc00", "#34c759", "#30b0c7", "#0071e3", "#5e5ce6", "#af52de", "#ff2d92", "#8e8e93"];
 
 const relTime = (ms) => {
   const s = Math.max(0, Math.floor((Date.now() - (ms || 0)) / 1000));
@@ -111,9 +125,14 @@ function DocEditor({ doc, me, isOwner, otherName, ownerUser, onChange, onToggleS
   const latestRef = useRef({ title: doc.title || "", body: doc.body || "" });
   const savedRef = useRef({ title: doc.title || "", body: doc.body || "" });
   const [confirmDel, setConfirmDel] = useState(false);
+  const [colorOpen, setColorOpen] = useState(false);
 
-  // Set the body once when this doc opens.
-  useEffect(() => { if (bodyRef.current) bodyRef.current.innerHTML = doc.body || ""; /* eslint-disable-next-line */ }, []);
+  // Set the body once when this doc opens, and prefer CSS styles for formatting.
+  useEffect(() => {
+    if (bodyRef.current) bodyRef.current.innerHTML = doc.body || "";
+    try { document.execCommand("styleWithCSS", false, true); } catch (e) { /* ignore */ }
+    /* eslint-disable-next-line */
+  }, []);
 
   // Live sync: if the other person edits while I am idle, refresh my view.
   useEffect(() => {
@@ -137,12 +156,36 @@ function DocEditor({ doc, me, isOwner, otherName, ownerUser, onChange, onToggleS
   useEffect(() => () => { clearTimeout(saveTimer.current); flush(); /* eslint-disable-next-line */ }, []);
 
   const onBodyInput = () => { latestRef.current.body = bodyRef.current.innerHTML; scheduleSave(); };
+  const onPaste = (e) => {
+    e.preventDefault();
+    const html = (e.clipboardData || window.clipboardData).getData("text/html");
+    const text = (e.clipboardData || window.clipboardData).getData("text/plain");
+    if (html) {
+      document.execCommand("insertHTML", false, sanitizeHtml(html));
+    } else {
+      // plain text: keep line breaks, escape any markup
+      const safe = (text || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
+      document.execCommand("insertHTML", false, safe);
+    }
+    onBodyInput();
+  };
   const onTitle = (v) => { setTitle(v); latestRef.current.title = v; scheduleSave(); };
   const apply = (tool) => {
     if (tool.block) document.execCommand("formatBlock", false, tool.block);
     else document.execCommand(tool.cmd, false, null);
     if (bodyRef.current) { latestRef.current.body = bodyRef.current.innerHTML; bodyRef.current.focus(); }
     scheduleSave();
+  };
+  const applyColor = (color) => {
+    try { document.execCommand("styleWithCSS", false, true); } catch (e) { /* ignore */ }
+    document.execCommand("foreColor", false, color);
+    if (bodyRef.current) { latestRef.current.body = bodyRef.current.innerHTML; bodyRef.current.focus(); }
+    scheduleSave();
+    setColorOpen(false);
+  };
+  const applyDefaultColor = () => {
+    const ink = bodyRef.current ? getComputedStyle(bodyRef.current).color : "#1d1d1f";
+    applyColor(ink);
   };
 
   return (
@@ -168,6 +211,19 @@ function DocEditor({ doc, me, isOwner, otherName, ownerUser, onChange, onToggleS
             <t.icon size={16} />
           </button>
         ))}
+        <div className="doc-color-wrap">
+          <button className="doc-tool" title="Text colour" onMouseDown={(e) => { e.preventDefault(); setColorOpen((o) => !o); }}>
+            <Palette size={16} />
+          </button>
+          {colorOpen && (
+            <div className="doc-color-pop" onMouseDown={(e) => e.preventDefault()}>
+              {TEXT_COLORS.map((c) => (
+                <button key={c} className="doc-swatch" style={{ background: c }} title={c} onMouseDown={(e) => { e.preventDefault(); applyColor(c); }} />
+              ))}
+              <button className="doc-swatch doc-swatch-default" title="Default (theme colour)" onMouseDown={(e) => { e.preventDefault(); applyDefaultColor(); }}>A</button>
+            </div>
+          )}
+        </div>
         {doc.shared && <span className="doc-live"><span className="doc-live-dot" /> Live, edits sync to {isOwner ? otherName : (ownerUser ? ownerUser.name : "the owner")}</span>}
       </div>
 
@@ -178,8 +234,9 @@ function DocEditor({ doc, me, isOwner, otherName, ownerUser, onChange, onToggleS
           contentEditable
           suppressContentEditableWarning
           onInput={onBodyInput}
+          onPaste={onPaste}
           onFocus={() => { focusedRef.current = true; }}
-          onBlur={() => { focusedRef.current = false; flush(); }}
+          onBlur={() => { focusedRef.current = false; setColorOpen(false); flush(); }}
           data-placeholder="Start writing..."
         />
       </div>

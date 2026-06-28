@@ -134,6 +134,11 @@ export function GlobalStyle() {
     .doc-toolbar { display: flex; align-items: center; gap: 3px; flex-wrap: wrap; background: var(--surface); border: 1px solid var(--line-2); border-radius: 12px; padding: 6px; margin-bottom: 14px; position: sticky; top: 8px; z-index: 5; }
     .doc-tool { display: grid; place-items: center; width: 34px; height: 34px; border: none; background: none; color: var(--ink-2); border-radius: 8px; cursor: pointer; }
     .doc-tool:hover { background: var(--line-2); color: var(--ink); }
+    .doc-color-wrap { position: relative; display: inline-flex; }
+    .doc-color-pop { position: absolute; top: 40px; left: 0; z-index: 20; display: grid; grid-template-columns: repeat(6, 22px); gap: 6px; padding: 9px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 12px 30px rgba(0,0,0,0.2); }
+    .doc-swatch { width: 22px; height: 22px; border-radius: 6px; border: 1px solid rgba(0,0,0,0.12); cursor: pointer; padding: 0; }
+    .doc-swatch:hover { transform: scale(1.12); }
+    .doc-swatch-default { background: var(--surface); color: var(--ink); font-size: 12px; font-weight: 500; display: grid; place-items: center; border: 1px solid var(--line); }
     .doc-live { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; font-size: 12px; color: var(--ink-3); padding-right: 6px; }
     .doc-live-dot { width: 7px; height: 7px; border-radius: 50%; background: #34C759; box-shadow: 0 0 0 0 rgba(52,199,89,0.5); animation: pulseGreen 2s ease-out infinite; }
     @keyframes pulseGreen { 0% { box-shadow: 0 0 0 0 rgba(52,199,89,0.5); } 70% { box-shadow: 0 0 0 6px rgba(52,199,89,0); } 100% { box-shadow: 0 0 0 0 rgba(52,199,89,0); } }
