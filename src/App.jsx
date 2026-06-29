@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { loadKey, saveKey, subscribeKey } from "./storage";
 import { firebaseConfigured } from "./firebase";
-import { Home, Repeat, CheckSquare, PiggyBank, CalendarDays, Clock, Receipt, User, Coins, FileText } from "lucide-react";
+import { Home, Repeat, CheckSquare, PiggyBank, CalendarDays, Clock, Receipt, User, Coins, FileText, Wrench, MoreHorizontal } from "lucide-react";
 
 import { GlobalStyle } from "./styles";
 import { Avatar, Modal, Btn, WideLogo, IconMark } from "./components/ui";
@@ -19,6 +19,7 @@ import { CompanyTab } from "./tabs/CompanyTab";
 import { DailyReport } from "./tabs/DailyReport";
 import { ProfileTab } from "./tabs/ProfileTab";
 import { DocsTab } from "./tabs/DocsTab";
+import { ToolsTab } from "./tabs/ToolsTab";
 
 import { todayStr, dateDiff, localTz, parseDate, toDateStr } from "./lib/dates";
 import { nextInvoiceDate } from "./lib/invoices";
@@ -37,7 +38,10 @@ const TABS = [
   { id: "vault", label: "Company", icon: PiggyBank },
   { id: "report", label: "Report", icon: CalendarDays },
   { id: "docs", label: "Docs", icon: FileText },
+  { id: "tools", label: "Tools", icon: Wrench },
 ];
+// Tabs grouped under the mobile "More" button to keep the bottom bar uncluttered.
+const MORE_IDS = ["docs", "tools"];
 
 const readView = () => { try { return localStorage.getItem("crica_view") || "dashboard"; } catch (e) { return "dashboard"; } };
 
@@ -46,6 +50,7 @@ export default function App() {
   const [currentUserId, setCurrentUserId] = useState(() => { try { return localStorage.getItem("crica_user") || null; } catch (e) { return null; } });
   const [tab, setTab] = useState(() => { const v = readView(); return v !== "settings" ? v : "dashboard"; });
   const [showSettings, setShowSettings] = useState(() => readView() === "settings");
+  const [showMore, setShowMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [dbError, setDbError] = useState(null);
 
@@ -351,6 +356,7 @@ export default function App() {
       case "vault": return <CompanyTab finance={finance} setFinance={setFinance} clients={clients} setClients={setClients} />;
       case "report": return <DailyReport users={users} me={me} habits={habits} tasks={tasks} focus={focus} work={work} schedules={schedules} setSchedules={setSchedules} meetings={meetings} onPropose={proposeMeeting} />;
       case "docs": return <DocsTab docs={docs} setDocs={setDocs} me={me} users={users} />;
+      case "tools": return <ToolsTab />;
       default: return null;
     }
   };
@@ -380,15 +386,32 @@ export default function App() {
         <main className="app-main">{renderTab()}</main>
 
         <nav className="bottom-nav">
-          {TABS.map((tb) => (
+          {TABS.filter((tb) => !MORE_IDS.includes(tb.id)).map((tb) => (
             <button key={tb.id} className={"bottom-nav-item " + (!showSettings && tab === tb.id ? "on" : "")} onClick={() => { setTab(tb.id); setShowSettings(false); }}>
               <span className="nav-ic-wrap"><tb.icon size={20} />{tb.id === "tasks" && unreadUpdates > 0 && <span className="nav-badge">{unreadUpdates}</span>}</span><span>{tb.label}</span>
             </button>
           ))}
+          <button className={"bottom-nav-item " + (!showSettings && MORE_IDS.includes(tab) ? "on" : "")} onClick={() => setShowMore(true)}>
+            <MoreHorizontal size={20} /><span>More</span>
+          </button>
           <button className={"bottom-nav-item " + (showSettings ? "on" : "")} onClick={() => setShowSettings(true)}>
             <User size={20} /><span>Profile</span>
           </button>
         </nav>
+
+        {showMore && (
+          <div className="more-scrim" onClick={() => setShowMore(false)}>
+            <div className="more-sheet" onClick={(e) => e.stopPropagation()}>
+              <div className="more-grip" />
+              <div className="more-title">More</div>
+              {TABS.filter((tb) => MORE_IDS.includes(tb.id)).map((tb) => (
+                <button key={tb.id} className={"more-item " + (!showSettings && tab === tb.id ? "on" : "")} onClick={() => { setTab(tb.id); setShowSettings(false); setShowMore(false); }}>
+                  <tb.icon size={20} /> <span>{tb.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <FocusFab session={focusEngine.session} onOpen={() => setFocusOpen(true)} />
