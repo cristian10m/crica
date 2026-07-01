@@ -121,10 +121,18 @@ export function GlobalStyle() {
     .hours-bar-fill { height: 100%; border-radius: 999px; min-width: 4px; transition: width .6s cubic-bezier(.2,.8,.2,1); }
     .hours-val { font-size: 14px; font-weight: 500; color: var(--ink); min-width: 56px; text-align: right; font-variant-numeric: tabular-nums; }
     .hours-days { display: flex; gap: 6px; padding-top: 14px; border-top: 1px solid var(--line-2); }
-    .hours-day { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .hours-day { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; background: none; border: none; cursor: pointer; padding: 6px 2px 4px; border-radius: 10px; transition: background .15s; }
+    .hours-day:hover { background: var(--line-2); }
+    .hours-day.on { background: var(--line-2); }
+    .hours-day.on .hours-day-lab { color: var(--ink); font-weight: 500; }
+    .hours-day.today .hours-day-lab { color: var(--blue); }
     .hours-day-bars { display: flex; align-items: flex-end; justify-content: center; gap: 3px; height: 54px; width: 100%; }
     .hours-day-bar { width: 7px; border-radius: 4px 4px 2px 2px; min-height: 0; transition: height .5s cubic-bezier(.2,.8,.2,1); }
     .hours-day-lab { font-size: 11px; color: var(--ink-3); }
+    .hours-sel { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--line-2); }
+    .hours-sel-day { font-size: 13px; font-weight: 500; color: var(--ink); }
+    .hours-sel-item { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); }
+    .hours-sel-item i { width: 9px; height: 9px; border-radius: 3px; display: inline-block; }
 
     /* Docs */
     .docs-search { display: flex; align-items: center; gap: 9px; background: var(--surface); border: 1.5px solid var(--line); border-radius: 12px; padding: 9px 13px; margin-bottom: 14px; color: var(--ink-3); }

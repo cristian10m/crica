@@ -82,6 +82,10 @@ export function Dashboard({ users: allUsers, me, habits, tasks, finance, focus =
   const dailyWorked = users.map((u) => week.map((d) => (work || []).filter((w) => w.userId === u.id && w.date === d).reduce((s, w) => s + (w.seconds || 0), 0)));
   const maxWeekWorked = Math.max(1, ...weekWorked);
   const maxDayWorked = Math.max(1, ...dailyWorked.flat());
+  const todayS = todayStr();
+  const [selDate, setSelDate] = useState(todayS);
+  const selIdx = week.indexOf(selDate) >= 0 ? week.indexOf(selDate) : (week.indexOf(todayS) >= 0 ? week.indexOf(todayS) : week.length - 1);
+  const selDayStr = week[selIdx];
 
   const achievements = useMemo(() => {
     const list = [];
@@ -147,15 +151,21 @@ export function Dashboard({ users: allUsers, me, habits, tasks, finance, focus =
         </div>
         <div className="hours-days">
           {week.map((d, di) => (
-            <div className="hours-day" key={d}>
+            <button type="button" className={"hours-day" + (di === selIdx ? " on" : "") + (d === todayS ? " today" : "")} key={d} onClick={() => setSelDate(d)}>
               <div className="hours-day-bars">
                 {users.map((u, i) => (
-                  <div key={u.id} className="hours-day-bar" title={`${u.name}: ${fmtHrs(dailyWorked[i][di])}`}
+                  <div key={u.id} className="hours-day-bar"
                     style={{ height: `${Math.max(dailyWorked[i][di] > 0 ? 6 : 0, (dailyWorked[i][di] / maxDayWorked) * 100)}%`, background: u.color }} />
                 ))}
               </div>
               <span className="hours-day-lab">{WEEKDAY[parseDate(d).getDay()][0]}</span>
-            </div>
+            </button>
+          ))}
+        </div>
+        <div className="hours-sel">
+          <span className="hours-sel-day">{selDayStr === todayS ? "Today" : prettyDate(selDayStr)}</span>
+          {users.map((u, i) => (
+            <span className="hours-sel-item" key={u.id}><i style={{ background: u.color }} /> {u.name} {fmtHrs(dailyWorked[i][selIdx])}</span>
           ))}
         </div>
       </Card>
