@@ -95,6 +95,22 @@ export function lastDone(habit) {
 }
 
 export function habitPoints(h) { return HABIT_POINTS; }
+
+// A checked habit unlocks again 12 hours later, rather than staying locked for the
+// whole calendar day. Streaks and points stay day-based (one per calendar day).
+export const HABIT_RESET_HOURS = 12;
+export function lastCompletionMs(habit) {
+  const comp = habit.completions || {};
+  let max = null;
+  for (const k in comp) { const v = comp[k]; if (typeof v === "number" && (max == null || v > max)) max = v; }
+  return max;
+}
+export function habitCooldown(habit, now = Date.now()) {
+  const last = lastCompletionMs(habit);
+  if (last == null) return { onCooldown: false, last: null, remainingMs: 0 };
+  const remainingMs = last + HABIT_RESET_HOURS * 3600000 - now;
+  return { onCooldown: remainingMs > 0, last, remainingMs: Math.max(0, remainingMs) };
+}
 export function taskPoints(t) {
   if (t.parentId) return 0; // subtasks are just a checklist, the parent carries the points
   if (t.isPrivate || t.private) return 0; // personal tasks do not score

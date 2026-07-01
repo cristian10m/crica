@@ -87,6 +87,19 @@ export function GlobalStyle() {
     .more-item { width: 100%; display: flex; align-items: center; gap: 13px; padding: 14px 12px; border: none; background: transparent; color: var(--ink); font-size: 15px; border-radius: 12px; cursor: pointer; }
     .more-item:hover { background: var(--line-2); }
     .more-item.on { color: var(--blue); background: rgba(0,113,227,0.08); }
+    .avatar-wrap .avatar-status { position: absolute; right: -1px; bottom: -1px; border-radius: 50%; border: 2px solid var(--surface); box-sizing: content-box; z-index: 2; }
+    .avatar-status.online { background: #34c759; }
+    .vs-status { font-size: 11px; margin-top: 3px; color: var(--ink-3); }
+    .vs-status.working { color: var(--blue); }
+    .vs-status.online { color: #1f9d4d; }
+    .profile-status { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--ink-3); margin-top: 6px; }
+    .profile-status.working { color: var(--blue); }
+    .profile-status.online { color: #1f9d4d; }
+    .profile-status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3); }
+    .profile-status-dot.online { background: #34c759; }
+    .profile-status-dot.working { background: var(--blue); }
+    .avatar-status.working { background: var(--blue); animation: pulseBlue 1.8s ease-out infinite; }
+    @keyframes pulseBlue { 0% { box-shadow: 0 0 0 0 rgba(0,113,227,0.5); } 70% { box-shadow: 0 0 0 6px rgba(0,113,227,0); } 100% { box-shadow: 0 0 0 0 rgba(0,113,227,0); } }
     @media (min-width: 820px) { .more-scrim { display: none !important; } }
 
     .app-main { padding: 16px 16px 24px; }
@@ -490,6 +503,8 @@ export function GlobalStyle() {
     .habit-meta, .task-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
     .chip { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 500; color: var(--ink-2); background: rgba(0,0,0,0.045); border: 1px solid transparent; padding: 3px 8px; border-radius: 8px; }
     .chip.warn { background: rgba(255,149,0,0.12); color: #c77700; }
+    .chip.cool { background: rgba(0,113,227,0.1); color: var(--blue); }
+    .chip.ready { background: rgba(52,199,89,0.12); color: #1f9d4d; }
     .chip.danger { background: rgba(255,59,48,0.1); color: #ff3b30; }
     .chip.danger-soft { background: rgba(255,59,48,0.07); color: #ff6259; }
     .chip.gold { background: rgba(255,159,10,0.14); color: #b46a00; border-color: rgba(255,159,10,0.35); }

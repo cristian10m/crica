@@ -53,6 +53,15 @@ export async function saveKey(key, data) {
   }
 }
 
+// Write to a nested path (e.g. "presence/cristian") without overwriting siblings.
+export async function savePath(path, data) {
+  try {
+    await set(ref(db, ROOT + "/" + path), clean(data));
+  } catch (e) {
+    console.warn("[Crica] savePath failed for", path, e);
+  }
+}
+
 export function subscribeKey(key, cb) {
   return onValue(
     ref(db, ROOT + "/" + key),

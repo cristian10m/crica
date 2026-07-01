@@ -2,13 +2,14 @@ import { useState, useEffect } from "react";
 import { Plus, Check, Trash2, GripVertical, Flame, Repeat, Eye, AlertTriangle, CalendarDays } from "lucide-react";
 import { Card, Btn, Modal, Field, PageHead } from "../components/ui";
 import { DraggableList } from "../components/DraggableList";
-import { evalHabit, habitPoints, lastDone } from "../lib/points";
+import { evalHabit, habitPoints, lastDone, habitCooldown, HABIT_RESET_HOURS } from "../lib/points";
 import { todayStr, prettyDate } from "../lib/dates";
 import { fireConfetti } from "../lib/confetti";
 import { uid } from "../lib/format";
 import { HABIT_ICONS, ICON_GLYPH, HABIT_POINTS } from "../lib/constants";
 
 const freqLabel = (h) => (h.freqType === "weekly" ? `${Math.max(1, Math.min(7, h.perWeek || 3))}x / week` : "Daily");
+const fmtRemain = (ms) => { const h = Math.floor(ms / 3600000), m = Math.round((ms % 3600000) / 60000); return h > 0 ? `${h}h ${m}m` : `${m}m`; };
 
 function lastDoneText(h) {
   const ld = lastDone(h);
@@ -21,16 +22,24 @@ function lastDoneText(h) {
 export function HabitsTab({ users, me, habits, setHabits }) {
   const partner = users.find((u) => u.id !== me.id);
   const [modal, setModal] = useState(null); // null | "new" | habit object
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => { const id = setInterval(() => setNow(Date.now()), 30000); return () => clearInterval(id); }, []);
   const myHabits = habits.filter((h) => h.ownerId === me.id).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   const partnerHabits = habits.filter((h) => h.ownerId === partner.id).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
   const toggleToday = (habit, e) => {
-    const t = todayStr();
     const comp = { ...(habit.completions || {}) };
-    const wasDone = !!comp[t];
-    if (wasDone) delete comp[t]; else comp[t] = Date.now(); // store the moment it was checked
-    setHabits(habits.map((h) => h.id === habit.id ? { ...h, completions: comp } : h));
-    if (!wasDone) {
+    const cd = habitCooldown(habit, Date.now());
+    if (cd.onCooldown) {
+      // Still within the 12h window: undo the completion holding the cooldown.
+      let maxK = null, maxV = -1;
+      for (const k in comp) { const ts = typeof comp[k] === "number" ? comp[k] : 0; if (ts >= maxV) { maxV = ts; maxK = k; } }
+      if (maxK) delete comp[maxK];
+      setHabits(habits.map((h) => h.id === habit.id ? { ...h, completions: comp } : h));
+    } else {
+      // Available again: mark (or refresh) today's completion and restart the window.
+      comp[todayStr()] = Date.now();
+      setHabits(habits.map((h) => h.id === habit.id ? { ...h, completions: comp } : h));
       const rect = e?.currentTarget?.getBoundingClientRect();
       fireConfetti(rect ? rect.left + rect.width / 2 : undefined, rect ? rect.top : undefined);
     }
@@ -48,7 +57,7 @@ export function HabitsTab({ users, me, habits, setHabits }) {
 
   return (
     <div className="page">
-      <PageHead title="Habits" subtitle="Two strikes and it resets. Keep the chain alive.">
+      <PageHead title="Habits" subtitle="Checks unlock again 12 hours later, so a late-night one won't block you the next evening. Two strikes and the streak resets.">
         <Btn onClick={() => setModal("new")}><Plus size={16} /> New habit</Btn>
       </PageHead>
 
@@ -58,11 +67,13 @@ export function HabitsTab({ users, me, habits, setHabits }) {
 
       <DraggableList items={myHabits} getKey={(h) => h.id} onReorder={reorder} renderItem={(h, ctx) => {
         const ev = evalHabit(h, todayStr());
+        const cd = habitCooldown(h, now);
+        const checked = cd.onCooldown;
         return (
-          <Card className={"habit-card " + (ev.completedToday ? "habit-done" : "")}>
+          <Card className={"habit-card " + (checked ? "habit-done" : "")}>
             <button className="drag-handle" {...ctx.handle}><GripVertical size={18} /></button>
-            <button className={"habit-check " + (ev.completedToday ? "on" : "")} onClick={(e) => toggleToday(h, e)} style={ev.completedToday ? { background: me.color, borderColor: me.color } : {}}>
-              {ev.completedToday && <Check size={18} />}
+            <button className={"habit-check " + (checked ? "on" : "")} onClick={(e) => toggleToday(h, e)} style={checked ? { background: me.color, borderColor: me.color } : {}}>
+              {checked && <Check size={18} />}
             </button>
             <div className="habit-main" onClick={() => setModal(h)}>
               <div className="habit-name">{ICON_GLYPH[h.icon] || "\u2B50"} {h.name}</div>
@@ -71,6 +82,8 @@ export function HabitsTab({ users, me, habits, setHabits }) {
                 <span className="chip"><CalendarDays size={12} /> {freqLabel(h)}</span>
                 {ev.weekly && <span className={"chip " + (ev.weekCount >= ev.weekTarget ? "" : "")}>{ev.weekCount}/{ev.weekTarget} this week</span>}
                 <span className="chip">+{habitPoints(h)} pts</span>
+                {cd.onCooldown && <span className="chip cool">Ready in {fmtRemain(cd.remainingMs)}</span>}
+                {!cd.onCooldown && ev.completedToday && <span className="chip ready">Ready to repeat</span>}
                 {!ev.weekly && ev.status === "warning" && <span className="chip warn"><AlertTriangle size={12} /> 1 chance left today</span>}
                 {!ev.weekly && ev.status === "broken" && !ev.completedToday && <span className="chip danger">Streak reset</span>}
                 {ev.weekly && ev.status === "warning" && <span className="chip warn"><AlertTriangle size={12} /> behind this week</span>}
@@ -144,7 +157,7 @@ function HabitModal({ open, habit, onClose, onSave, onDelete }) {
       <p className="muted-small" style={{ marginTop: 6 }}>
         {freqType === "weekly"
           ? `Hit it ${perWeek} day${perWeek === 1 ? "" : "s"} a week to keep the week, and missing a day in between will not break you.`
-          : "Keep it every day. Miss one day for a warning, miss two in a row and the streak resets."}
+          : "Keep it every day. The check unlocks again 12 hours after you tick it. Miss a whole day for a warning, miss two in a row and the streak resets."}
       </p>
       <div className="toggle-row" style={{ marginTop: 4 }}>
         <span>Remind me daily</span>

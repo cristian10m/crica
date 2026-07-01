@@ -25,7 +25,20 @@ function StatTile({ icon, label, value, accent }) {
   );
 }
 
-export function Dashboard({ users: allUsers, me, habits, tasks, finance, focus = [], work = [] }) {
+const presenceRel = (ms) => {
+  const s = Math.max(0, Math.floor((Date.now() - ms) / 1000));
+  if (s < 3600) { const m = Math.floor(s / 60); return m <= 1 ? "1m" : `${m}m`; }
+  const h = Math.floor(s / 3600); if (h < 24) return `${h}h`;
+  const d = Math.floor(h / 24); return `${d}d`;
+};
+function statusText(p) {
+  if (!p) return "";
+  if (p.state === "working") return "Working now";
+  if (p.state === "online") return "Online";
+  return p.lastSeen ? `Last seen ${presenceRel(p.lastSeen)} ago` : "Offline";
+}
+
+export function Dashboard({ users: allUsers, me, habits, tasks, finance, focus = [], work = [], presenceOf }) {
   const users = (allUsers || []).filter((u) => !u.hidden || u.id === me.id);
   const [anchor, setAnchor] = useState(todayStr());
   const week = useMemo(() => weekDates(anchor), [anchor]);
@@ -92,8 +105,9 @@ export function Dashboard({ users: allUsers, me, habits, tasks, finance, focus =
 
       <Card className="vs-card">
         <div className="vs-side">
-          <Avatar user={users[0]} size={44} />
+          <Avatar user={users[0]} size={44} status={presenceOf ? presenceOf(users[0].id).state : undefined} />
           <div className="vs-name" style={nameStyle(users[0]) || undefined}>{users[0].name}</div>
+          {presenceOf && <div className={"vs-status " + presenceOf(users[0].id).state}>{statusText(presenceOf(users[0].id))}</div>}
           <div className="vs-points" style={{ color: users[0].color }}>{Math.round(useCountUp(weekPoints[0]))}</div>
           <div className="vs-lab">points</div>
         </div>
@@ -102,8 +116,9 @@ export function Dashboard({ users: allUsers, me, habits, tasks, finance, focus =
           <span className="vs-vs">VS</span>
         </div>
         <div className="vs-side">
-          <Avatar user={users[1]} size={44} />
+          <Avatar user={users[1]} size={44} status={presenceOf ? presenceOf(users[1].id).state : undefined} />
           <div className="vs-name" style={nameStyle(users[1]) || undefined}>{users[1].name}</div>
+          {presenceOf && <div className={"vs-status " + presenceOf(users[1].id).state}>{statusText(presenceOf(users[1].id))}</div>}
           <div className="vs-points" style={{ color: users[1].color }}>{Math.round(useCountUp(weekPoints[1]))}</div>
           <div className="vs-lab">points</div>
         </div>

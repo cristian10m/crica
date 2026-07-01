@@ -56,19 +56,22 @@ export function Ring({ value, size = 64, stroke = 7, color = BLUE, label, sub })
 }
 import { decoFile, decoSrc } from "../lib/shop";
 
-export function Avatar({ user, size = 34 }) {
+export function Avatar({ user, size = 34, status }) {
   if (!user) return null;
   const face = user.avatar
     ? <img className="avatar" src={user.avatar} alt={user.name} style={{ width: size, height: size, objectFit: "cover" }} />
     : <div className="avatar" style={{ width: size, height: size, background: user.color, fontSize: size * 0.4 }}>{user.name.trim().charAt(0).toUpperCase()}</div>;
   const deco = decoFile(user);
-  if (!deco) return face;
+  const showDot = status === "online" || status === "working";
+  const dot = showDot ? <span className={"avatar-status " + status} style={{ width: Math.max(9, Math.round(size * 0.3)), height: Math.max(9, Math.round(size * 0.3)) }} /> : null;
+  if (!deco && !dot) return face;
   const ds = Math.round(size * 1.35);
   const off = Math.round((ds - size) / 2);
   return (
     <span className="avatar-wrap" style={{ width: size, height: size }}>
       {face}
-      <img className="avatar-deco" src={decoSrc(deco)} alt="" style={{ width: ds, height: ds, top: -off, left: -off }} />
+      {deco && <img className="avatar-deco" src={decoSrc(deco)} alt="" style={{ width: ds, height: ds, top: -off, left: -off }} />}
+      {dot}
     </span>
   );
 }

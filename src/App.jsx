@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { loadKey, saveKey, subscribeKey } from "./storage";
+import { loadKey, saveKey, subscribeKey, savePath } from "./storage";
 import { firebaseConfigured } from "./firebase";
 import { Home, Repeat, CheckSquare, PiggyBank, CalendarDays, Clock, Receipt, User, Coins, FileText, Wrench, MoreHorizontal } from "lucide-react";
 
@@ -61,6 +61,7 @@ export default function App() {
   const [finance, setFinanceState] = useState(DEFAULT_FINANCE);
   const [focus, setFocusState] = useState([]);
   const [work, setWorkState] = useState([]);
+  const [presence, setPresence] = useState(null);
   const [updates, setUpdatesState] = useState([]);
   const [meetings, setMeetingsState] = useState([]);
   const [schedules, setSchedulesState] = useState({});
@@ -112,6 +113,7 @@ export default function App() {
 
   const focusEngine = useFocusEngine({ onBank: bankFocus });
   const pip = usePipWindow();
+
   const stopMyWork = () => setTasksState((prev) => {
     const next = (prev || []).map((t) => {
       if (!(t.working && t.working[currentUserId] != null)) return t;
@@ -196,6 +198,7 @@ export default function App() {
       subscribeKey("finance", (f) => { if (f) setFinanceState(f); }),
       subscribeKey("focus", (f) => setFocusState(f || [])),
       subscribeKey("work", (w) => setWorkState(w || [])),
+      subscribeKey("presence", (p) => setPresence(p || null)),
       subscribeKey("updates", (u) => setUpdatesState(u || [])),
       subscribeKey("meetings", (m) => setMeetingsState(m || [])),
       subscribeKey("schedules", (s) => setSchedulesState(s || {})),
@@ -242,6 +245,37 @@ export default function App() {
   const goHome = () => { setTab("dashboard"); setShowSettings(false); };
 
   const me = users?.find((u) => u.id === currentUserId);
+
+  // Presence: I'm online, and "working" when a task timer or focus session is live.
+  // Defined here, after `me` exists, so it can safely reference it.
+  const iAmWorking = (tasks || []).some((t) => t.working && t.working[currentUserId] != null)
+    || (focusEngine.session && focusEngine.session.phase === "running");
+  const workingRef = useRef(iAmWorking);
+  workingRef.current = iAmWorking;
+  useEffect(() => {
+    if (!me) return;
+    const beat = () => savePath(`presence/${currentUserId}`, { lastSeen: Date.now(), working: !!workingRef.current, name: me.name });
+    beat();
+    const id = setInterval(beat, 40000);
+    const onVis = () => { if (document.visibilityState === "visible") beat(); };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("focus", beat);
+    return () => { clearInterval(id); document.removeEventListener("visibilitychange", onVis); window.removeEventListener("focus", beat); };
+  }, [me?.id, currentUserId]);
+  useEffect(() => { if (me) savePath(`presence/${currentUserId}`, { lastSeen: Date.now(), working: !!iAmWorking, name: me.name }); }, [iAmWorking]);
+
+  // Re-render every 30s so presence dots and "last seen" text stay current.
+  const [, setPresenceTick] = useState(0);
+  useEffect(() => { const id = setInterval(() => setPresenceTick((t) => t + 1), 30000); return () => clearInterval(id); }, []);
+  const presenceOf = (uid) => {
+    const p = presence && presence[uid];
+    if (!p || !p.lastSeen) return { state: "offline", lastSeen: null, working: false };
+    const age = Date.now() - p.lastSeen;
+    if (p.working && age < 140000) return { state: "working", lastSeen: p.lastSeen, working: true };
+    if (age < 100000) return { state: "online", lastSeen: p.lastSeen, working: false };
+    return { state: "offline", lastSeen: p.lastSeen, working: false };
+  };
+
   const unreadUpdates = (updates || []).filter((u) => u.userId !== currentUserId && (u.createdAt || 0) > (me?.lastSeenUpdates || 0)).length;
   const myBalance = me ? earnedBalance(totalPoints(me.id, habits, tasks, focus, work), me) : 0;
 
@@ -348,9 +382,9 @@ export default function App() {
   if (!currentUserId || !me) return <><GlobalStyle /><LoginScreen users={users} onLogin={loginAs} /></>;
 
   const renderTab = () => {
-    if (showSettings) return <ProfileTab users={users} me={me} setUsers={setUsers} onLogout={logout} dark={dark} setDark={setDark} notifOn={notifOn} enableNotifs={enableNotifs} habits={habits} tasks={tasks} focus={focus} work={work} />;
+    if (showSettings) return <ProfileTab users={users} me={me} setUsers={setUsers} onLogout={logout} dark={dark} setDark={setDark} notifOn={notifOn} enableNotifs={enableNotifs} habits={habits} tasks={tasks} focus={focus} work={work} presenceOf={presenceOf} />;
     switch (tab) {
-      case "dashboard": return <Dashboard users={users} me={me} habits={habits} tasks={tasks} finance={finance} focus={focus} work={work} />;
+      case "dashboard": return <Dashboard users={users} me={me} habits={habits} tasks={tasks} finance={finance} focus={focus} work={work} presenceOf={presenceOf} />;
       case "habits": return <HabitsTab users={users} me={me} habits={habits} setHabits={setHabits} />;
       case "tasks": return <TasksTab users={users} me={me} tasks={tasks} setTasks={setTasks} clients={clients} board={tasksBoard} setBoard={setTasksBoard} onWorkStart={() => pip.openPip()} onWorkEnd={logWork} updates={updates} onUpdate={logUpdate} onEditUpdate={editUpdate} onDeleteUpdate={deleteUpdate} onSeenUpdates={markUpdatesSeen} unreadUpdates={unreadUpdates} />;
       case "vault": return <CompanyTab finance={finance} setFinance={setFinance} clients={clients} setClients={setClients} />;

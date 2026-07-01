@@ -27,7 +27,20 @@ function computeBadges(s) {
   return b;
 }
 
-export function ProfileTab({ users, me, setUsers, onLogout, dark, setDark, notifOn, enableNotifs, habits, tasks, focus, work = [] }) {
+function profileRel(ms) {
+  const s = Math.max(0, Math.floor((Date.now() - ms) / 1000));
+  if (s < 3600) { const m = Math.floor(s / 60); return m <= 1 ? "1m" : `${m}m`; }
+  const h = Math.floor(s / 3600); if (h < 24) return `${h}h`;
+  const d = Math.floor(h / 24); return `${d}d`;
+}
+function profileStatusText(p) {
+  if (!p) return "";
+  if (p.state === "working") return "Working right now";
+  if (p.state === "online") return "Online now";
+  return p.lastSeen ? `Last seen ${profileRel(p.lastSeen)} ago` : "Offline";
+}
+
+export function ProfileTab({ users, me, setUsers, onLogout, dark, setDark, notifOn, enableNotifs, habits, tasks, focus, work = [], presenceOf }) {
   const [viewId, setViewId] = useState(me.id);
   const viewed = users.find((u) => u.id === viewId) || me;
   const other = users.find((u) => u.id !== viewed.id);
@@ -88,13 +101,14 @@ export function ProfileTab({ users, me, setUsers, onLogout, dark, setDark, notif
 
       <Card className="profile-hero">
         <div className="profile-avatar-wrap">
-          <Avatar user={viewed} size={92} />
+          <Avatar user={viewed} size={92} status={presenceOf ? presenceOf(viewed.id).state : undefined} />
           {isSelf && (
             <button className="profile-cam" onClick={() => fileRef.current && fileRef.current.click()} aria-label="Change photo"><Camera size={16} /></button>
           )}
           <input ref={fileRef} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => { onPickImage(e.target.files[0]); e.target.value = ""; }} />
         </div>
         <div className="profile-name" style={nameStyle(viewed) || undefined}>{viewed.name}</div>
+        {presenceOf && !isSelf && (() => { const p = presenceOf(viewed.id); return <div className={"profile-status " + p.state}><span className={"profile-status-dot " + p.state} />{profileStatusText(p)}</div>; })()}
         <div className="profile-rank" style={{ color: stats.rank.color, borderColor: stats.rank.color + "55" }}>{stats.rank.title}</div>
         <div className="profile-balance"><Coins size={14} /> {balance.toLocaleString()} points to spend</div>
         {viewed.bio ? <div className="profile-bio">{viewed.bio}</div> : (isSelf && <div className="profile-bio muted-small">Add a motto in settings below.</div>)}
