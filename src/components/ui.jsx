@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { X, Crown } from "lucide-react";
 import { BLUE } from "../lib/constants";
 
@@ -22,11 +22,25 @@ export function Segmented({ options, value, onChange }) {
     </div>
   );
 }
-export function Modal({ open, onClose, title, children, wide }) {
+export function Modal({ open, onClose, title, children, wide, onSubmit }) {
+  const downOnScrim = useRef(false);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => {
+      if (e.key === "Escape") { onClose && onClose(); }
+      else if (e.key === "Enter" && onSubmit && !["TEXTAREA", "BUTTON", "SELECT"].includes(e.target.tagName)) { e.preventDefault(); onSubmit(); }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose, onSubmit]);
   if (!open) return null;
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className={"modal " + (wide ? "modal-wide" : "")} onClick={(e) => e.stopPropagation()}>
+    <div
+      className="modal-overlay"
+      onPointerDown={(e) => { downOnScrim.current = e.target === e.currentTarget; }}
+      onClick={(e) => { if (e.target === e.currentTarget && downOnScrim.current && onClose) onClose(); downOnScrim.current = false; }}
+    >
+      <div className={"modal " + (wide ? "modal-wide" : "")}>
         <div className="modal-head">
           <h3>{title}</h3>
           <IconBtn onClick={onClose}><X size={18} /></IconBtn>

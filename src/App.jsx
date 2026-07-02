@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { loadKey, saveKey, subscribeKey, savePath } from "./storage";
 import { firebaseConfigured } from "./firebase";
-import { Home, Repeat, CheckSquare, PiggyBank, CalendarDays, Clock, Receipt, User, Coins, FileText, Wrench, MoreHorizontal } from "lucide-react";
+import { Home, Repeat, CheckSquare, PiggyBank, CalendarDays, Clock, Receipt, User, Coins, FileText, Wrench, MoreHorizontal, Contact } from "lucide-react";
 
 import { GlobalStyle } from "./styles";
 import { Avatar, Modal, Btn, WideLogo, IconMark } from "./components/ui";
@@ -20,6 +20,7 @@ import { DailyReport } from "./tabs/DailyReport";
 import { ProfileTab } from "./tabs/ProfileTab";
 import { DocsTab } from "./tabs/DocsTab";
 import { ToolsTab } from "./tabs/ToolsTab";
+import { LeadsTab } from "./tabs/LeadsTab";
 
 import { todayStr, dateDiff, localTz, parseDate, toDateStr } from "./lib/dates";
 import { nextInvoiceDate } from "./lib/invoices";
@@ -39,9 +40,10 @@ const TABS = [
   { id: "report", label: "Report", icon: CalendarDays },
   { id: "docs", label: "Docs", icon: FileText },
   { id: "tools", label: "Tools", icon: Wrench },
+  { id: "leads", label: "Leads", icon: Contact },
 ];
 // Tabs grouped under the mobile "More" button to keep the bottom bar uncluttered.
-const MORE_IDS = ["docs", "tools"];
+const MORE_IDS = ["docs", "tools", "leads"];
 
 const readView = () => { try { return localStorage.getItem("crica_view") || "dashboard"; } catch (e) { return "dashboard"; } };
 
@@ -51,6 +53,13 @@ export default function App() {
   const [tab, setTab] = useState(() => { const v = readView(); return v !== "settings" ? v : "dashboard"; });
   const [showSettings, setShowSettings] = useState(() => readView() === "settings");
   const [showMore, setShowMore] = useState(false);
+  const moreDownRef = useRef(false);
+  useEffect(() => {
+    if (!showMore) return;
+    const onKey = (e) => { if (e.key === "Escape") setShowMore(false); };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [showMore]);
   const [loading, setLoading] = useState(true);
   const [dbError, setDbError] = useState(null);
 
@@ -62,6 +71,7 @@ export default function App() {
   const [focus, setFocusState] = useState([]);
   const [work, setWorkState] = useState([]);
   const [presence, setPresence] = useState(null);
+  const [pipeline, setPipelineState] = useState(null);
   const [updates, setUpdatesState] = useState([]);
   const [meetings, setMeetingsState] = useState([]);
   const [schedules, setSchedulesState] = useState({});
@@ -199,6 +209,7 @@ export default function App() {
       subscribeKey("focus", (f) => setFocusState(f || [])),
       subscribeKey("work", (w) => setWorkState(w || [])),
       subscribeKey("presence", (p) => setPresence(p || null)),
+      subscribeKey("pipeline", (p) => setPipelineState(p || null)),
       subscribeKey("updates", (u) => setUpdatesState(u || [])),
       subscribeKey("meetings", (m) => setMeetingsState(m || [])),
       subscribeKey("schedules", (s) => setSchedulesState(s || {})),
@@ -236,7 +247,8 @@ export default function App() {
   const setHabits = (h) => setHabitsState((prev) => { const next = typeof h === "function" ? h(prev || []) : h; saveKey("habits", next); return next; });
   const setTasks = (u) => setTasksState((prev) => { const next = typeof u === "function" ? u(prev || []) : u; saveKey("tasks", next); return next; });
   const setDocs = (u) => setDocsState((prev) => { const next = typeof u === "function" ? u(prev || []) : u; saveKey("docs", next); return next; });
-  const setClients = (c) => { setClientsState(c); saveKey("clients", c); };
+  const setPipeline = (u) => setPipelineState((prev) => { const next = typeof u === "function" ? u(prev) : u; saveKey("pipeline", next); return next; });
+  const setClients = (u) => setClientsState((prev) => { const next = typeof u === "function" ? u(prev || []) : u; saveKey("clients", next); return next; });
   const setFinance = (f) => { setFinanceState(f); saveKey("finance", f); };
   const setSchedules = (s) => { setSchedulesState(s); saveKey("schedules", s); };
 
@@ -391,6 +403,7 @@ export default function App() {
       case "report": return <DailyReport users={users} me={me} habits={habits} tasks={tasks} focus={focus} work={work} schedules={schedules} setSchedules={setSchedules} meetings={meetings} onPropose={proposeMeeting} />;
       case "docs": return <DocsTab docs={docs} setDocs={setDocs} me={me} users={users} />;
       case "tools": return <ToolsTab />;
+      case "leads": return <LeadsTab pipeline={pipeline} setPipeline={setPipeline} me={me} />;
       default: return null;
     }
   };
@@ -434,7 +447,10 @@ export default function App() {
         </nav>
 
         {showMore && (
-          <div className="more-scrim" onClick={() => setShowMore(false)}>
+          <div className="more-scrim"
+            onPointerDown={(e) => { moreDownRef.current = e.target === e.currentTarget; }}
+            onClick={(e) => { if (e.target === e.currentTarget && moreDownRef.current) setShowMore(false); moreDownRef.current = false; }}
+          >
             <div className="more-sheet" onClick={(e) => e.stopPropagation()}>
               <div className="more-grip" />
               <div className="more-title">More</div>
