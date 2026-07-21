@@ -22,8 +22,24 @@ export function Segmented({ options, value, onChange }) {
     </div>
   );
 }
+// How many modals are currently open. The background scroll lock is released
+// only when the last one closes, so nested popups cannot unlock it early.
+let openModals = 0;
+
 export function Modal({ open, onClose, title, children, wide, onSubmit }) {
   const downOnScrim = useRef(false);
+  // Freeze the page behind the popup. Scrolling the background under a full
+  // screen overlay forces the browser to repaint the whole app for nothing.
+  useEffect(() => {
+    if (!open) return;
+    openModals += 1;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      openModals = Math.max(0, openModals - 1);
+      if (openModals === 0) document.body.style.overflow = prev || "";
+    };
+  }, [open]);
   useEffect(() => {
     if (!open) return;
     const onKey = (e) => {

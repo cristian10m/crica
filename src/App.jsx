@@ -29,6 +29,8 @@ import { scheduleReminders } from "./lib/reminders";
 import { useFocusEngine } from "./lib/focus";
 import { uid, hashPw } from "./lib/format";
 import { totalPoints } from "./lib/points";
+import { isPrivateTask, isRunning, isActive, elapsedMs, elapsedSecs, pauseWork, resumeWork, clearWork } from "./lib/work";
+import { publicUpdates } from "./lib/updates";
 import { earnedBalance } from "./lib/shop";
 import { DEFAULT_USERS, DEFAULT_FINANCE } from "./lib/constants";
 
@@ -94,7 +96,10 @@ export default function App() {
     setWorkState((prev) => { const next = [...(prev || []), rec]; saveKey("work", next); return next; });
   }, []);
 
-  const logUpdate = useCallback(({ taskId, taskTitle, note, done }) => {
+  // Updates are shared with everyone, so a private task must never produce one.
+  // This is the single choke point for creating them, so the guard lives here.
+  const logUpdate = useCallback(({ taskId, taskTitle, note, done, isPrivate }) => {
+    if (isPrivate) return;
     const rec = { id: uid(), userId: currentUserId, taskId, taskTitle, note: note || "", done: !!done, createdAt: Date.now() };
     setUpdatesState((prev) => { const next = [...(prev || []), rec]; saveKey("updates", next); return next; });
   }, [currentUserId]);
@@ -126,18 +131,25 @@ export default function App() {
 
   const stopMyWork = () => setTasksState((prev) => {
     const next = (prev || []).map((t) => {
-      if (!(t.working && t.working[currentUserId] != null)) return t;
-      const secs = Math.round((Date.now() - t.working[currentUserId]) / 1000);
-      logWork({ userId: currentUserId, taskId: t.id, seconds: secs });
-      const w = { ...t.working }; delete w[currentUserId]; return { ...t, working: w };
+      if (!isActive(t, currentUserId)) return t;
+      logWork({ userId: currentUserId, taskId: t.id, seconds: elapsedSecs(t, currentUserId) });
+      return clearWork(t, currentUserId);
     });
+    saveKey("tasks", next); return next;
+  });
+  const pauseMyWork = () => setTasksState((prev) => {
+    const next = (prev || []).map((t) => (isRunning(t, currentUserId) ? pauseWork(t, currentUserId) : t));
+    saveKey("tasks", next); return next;
+  });
+  const resumeMyWork = () => setTasksState((prev) => {
+    const next = (prev || []).map((t) => (isActive(t, currentUserId) && !isRunning(t, currentUserId) ? resumeWork(t, currentUserId) : t));
     saveKey("tasks", next); return next;
   });
 
   // Stopping from the popup opens the same "what did you get done" prompt as the list.
   const [stopPromptTask, setStopPromptTask] = useState(null);
   const promptStopWork = () => {
-    const t = (tasks || []).find((x) => x.working && x.working[currentUserId] != null);
+    const t = (tasks || []).find((x) => isActive(x, currentUserId));
     if (t) { setStopPromptTask(t); try { window.focus(); } catch (e) { /* ignore */ } }
   };
   const advanceRepeat = (dateStr, repeat) => {
@@ -147,9 +159,8 @@ export default function App() {
     else if (repeat === "monthly") d.setMonth(d.getMonth() + 1);
     return toDateStr(d);
   };
-  const finishMyStop = (task, { note = "", markDone = false, post = false }) => {
-    const startMs = (task.working || {})[currentUserId];
-    const secs = startMs != null ? Math.round((Date.now() - startMs) / 1000) : 0;
+  const finishMyStop = (task, { note = "", markDone = false, post = false, seconds = null }) => {
+    const secs = seconds != null ? Math.max(0, Math.round(seconds)) : elapsedSecs(task, currentUserId);
     if (secs > 0) logWork({ userId: currentUserId, taskId: task.id, seconds: secs });
     const alreadyDone = !!(task.completed || {})[currentUserId];
     const willDone = markDone && !alreadyDone;
@@ -158,18 +169,18 @@ export default function App() {
       let spawnedNext = cur.spawnedNext; let nextInstance = null;
       if (willDone && cur.repeat && !cur.spawnedNext) {
         spawnedNext = true;
-        nextInstance = { ...cur, id: uid(), completed: {}, working: {}, spawnedNext: false, createdDate: todayStr(), dueDate: cur.dueDate ? advanceRepeat(cur.dueDate, cur.repeat) : null, order: prev.length + 1 };
+        nextInstance = { ...cur, id: uid(), completed: {}, working: {}, acc: {}, spawnedNext: false, createdDate: todayStr(), dueDate: cur.dueDate ? advanceRepeat(cur.dueDate, cur.repeat) : null, order: prev.length + 1 };
       }
       let next = prev.map((t) => {
         if (t.id !== cur.id) return t;
-        const w = { ...(t.working || {}) }; delete w[currentUserId];
+        const cleared = clearWork(t, currentUserId);
         const comp = { ...(t.completed || {}) }; if (willDone) comp[currentUserId] = todayStr();
-        return { ...t, working: w, completed: comp, spawnedNext };
+        return { ...cleared, completed: comp, spawnedNext };
       });
       if (nextInstance) next = [...next, nextInstance];
       return next;
     });
-    if (post) logUpdate({ taskId: task.id, taskTitle: task.title, note, done: willDone || alreadyDone });
+    if (post) logUpdate({ taskId: task.id, taskTitle: task.title, note, done: willDone || alreadyDone, isPrivate: isPrivateTask(task) });
     setStopPromptTask(null);
   };
 
@@ -260,7 +271,8 @@ export default function App() {
 
   // Presence: I'm online, and "working" when a task timer or focus session is live.
   // Defined here, after `me` exists, so it can safely reference it.
-  const iAmWorking = (tasks || []).some((t) => t.working && t.working[currentUserId] != null)
+  // Paused does not count as working, on purpose: the dot should be honest.
+  const iAmWorking = (tasks || []).some((t) => isRunning(t, currentUserId))
     || (focusEngine.session && focusEngine.session.phase === "running");
   const workingRef = useRef(iAmWorking);
   workingRef.current = iAmWorking;
@@ -288,7 +300,8 @@ export default function App() {
     return { state: "offline", lastSeen: p.lastSeen, working: false };
   };
 
-  const unreadUpdates = (updates || []).filter((u) => u.userId !== currentUserId && (u.createdAt || 0) > (me?.lastSeenUpdates || 0)).length;
+  const visibleUpdates = useMemo(() => publicUpdates(updates, tasks), [updates, tasks]);
+  const unreadUpdates = visibleUpdates.filter((u) => u.userId !== currentUserId && (u.createdAt || 0) > (me?.lastSeenUpdates || 0)).length;
   const myBalance = me ? earnedBalance(totalPoints(me.id, habits, tasks, focus, work), me) : 0;
 
   // Dev helper for testing the shop from the browser console: cricaDev.give(5000) / cricaDev.reset()
@@ -382,7 +395,7 @@ export default function App() {
   }, [tasks, clients, habits, me, notifOn]);
 
   // Mini floating window (desktop): live while focusing or working a task
-  const myWorkingTask = currentUserId ? tasks.find((t) => t.working && t.working[currentUserId] != null) : null;
+  const myWorkingTask = currentUserId ? tasks.find((t) => isActive(t, currentUserId)) : null;
   const focusActive = focusEngine.session && focusEngine.session.phase !== "done";
   const pipShouldShow = !!(focusActive || myWorkingTask);
   useEffect(() => {
@@ -398,7 +411,7 @@ export default function App() {
     switch (tab) {
       case "dashboard": return <Dashboard users={users} me={me} habits={habits} tasks={tasks} finance={finance} focus={focus} work={work} presenceOf={presenceOf} />;
       case "habits": return <HabitsTab users={users} me={me} habits={habits} setHabits={setHabits} />;
-      case "tasks": return <TasksTab users={users} me={me} tasks={tasks} setTasks={setTasks} clients={clients} board={tasksBoard} setBoard={setTasksBoard} onWorkStart={() => pip.openPip()} onWorkEnd={logWork} updates={updates} onUpdate={logUpdate} onEditUpdate={editUpdate} onDeleteUpdate={deleteUpdate} onSeenUpdates={markUpdatesSeen} unreadUpdates={unreadUpdates} />;
+      case "tasks": return <TasksTab users={users} me={me} tasks={tasks} setTasks={setTasks} clients={clients} board={tasksBoard} setBoard={setTasksBoard} onWorkStart={() => pip.openPip()} onWorkEnd={logWork} updates={visibleUpdates} onUpdate={logUpdate} onEditUpdate={editUpdate} onDeleteUpdate={deleteUpdate} onSeenUpdates={markUpdatesSeen} unreadUpdates={unreadUpdates} />;
       case "vault": return <CompanyTab finance={finance} setFinance={setFinance} clients={clients} setClients={setClients} />;
       case "report": return <DailyReport users={users} me={me} habits={habits} tasks={tasks} focus={focus} work={work} schedules={schedules} setSchedules={setSchedules} meetings={meetings} onPropose={proposeMeeting} />;
       case "docs": return <DocsTab docs={docs} setDocs={setDocs} me={me} users={users} />;
@@ -471,10 +484,10 @@ export default function App() {
       {pip.pipWindow && pipShouldShow && createPortal(
         <PipMini
           focus={focusEngine.session}
-          workingTitle={myWorkingTask ? myWorkingTask.title : ""}
-          workingStart={myWorkingTask ? myWorkingTask.working[currentUserId] : null}
+          workingTask={myWorkingTask}
+          workingUserId={currentUserId}
           onPause={focusEngine.pause} onResume={focusEngine.resume} onEnd={focusEngine.end}
-          onStopWork={promptStopWork}
+          onPauseWork={pauseMyWork} onResumeWork={resumeMyWork} onStopWork={promptStopWork}
         />, pip.pipWindow.document.body)}
 
       <Modal open={dailyPrompt} onClose={() => dismissDaily(false)} title={`Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, ${me?.name || ""}`}>
@@ -489,8 +502,8 @@ export default function App() {
 
       <StopModal open={stopPromptTask !== null} task={stopPromptTask} me={me || { id: currentUserId }}
         onClose={() => setStopPromptTask(null)}
-        onPost={(note, markDone) => finishMyStop(stopPromptTask, { note, markDone, post: true })}
-        onSkip={() => finishMyStop(stopPromptTask, { post: false })} />
+        onPost={(res) => finishMyStop(stopPromptTask, { ...res, post: true })}
+        onSkip={(res) => finishMyStop(stopPromptTask, { ...res, post: false })} />
     </>
   );
 }

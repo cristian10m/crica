@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Plus, Check, Trash2, GripVertical, CheckSquare, Users, Building2, Clock, Filter, Hand, Inbox, Play, Square, Timer, Lock, Repeat, ChevronDown, ChevronRight, CornerDownRight, Search, X, MessageSquare, Pencil } from "lucide-react";
+import { Plus, Check, Trash2, GripVertical, CheckSquare, Users, Building2, Clock, Filter, Hand, Inbox, Play, Pause, Square, Timer, Lock, Repeat, ChevronDown, ChevronRight, CornerDownRight, Search, X, MessageSquare, Pencil } from "lucide-react";
 import { Card, Btn, IconBtn, Modal, Field, Segmented, Avatar, PageHead } from "../components/ui";
 import { StopModal } from "../components/StopModal";
 import { DraggableList } from "../components/DraggableList";
@@ -7,15 +7,8 @@ import { todayStr, dateDiff, prettyDate, parseDate, toDateStr, addDays } from ".
 import { fireConfetti } from "../lib/confetti";
 import { uid } from "../lib/format";
 import { TASK_IMPORTANCE } from "../lib/constants";
-
-const fmtElapsed = (ms) => {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60;
-  if (h > 0) return `${h}h ${m}m`;
-  if (m > 0) return `${m}m ${ss}s`;
-  return `${ss}s`;
-};
-const isPriv = (t) => !!(t.isPrivate || t.private);
+import { isPrivateTask as isPriv, isRunning, isPaused, isActive, elapsedMs, elapsedSecs, startWork, pauseWork, resumeWork, clearWork, fmtElapsed } from "../lib/work";
+import { publicUpdates } from "../lib/updates";
 const IMPORTANCE_RANK = { urgent: 0, high: 1, medium: 2, low: 3 };
 const rankOf = (t) => IMPORTANCE_RANK[t.importance] ?? 2;
 const REPEAT_LABEL = { daily: "Daily", weekly: "Weekly", monthly: "Monthly" };
@@ -54,13 +47,17 @@ export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard
   const isMyBoard = board === me.id;
   const q = query.trim().toLowerCase();
 
-  // Tick once a second while something is being worked on, so elapsed time stays live.
-  const anyWorking = tasks.some((t) => t.working && t.working[board] != null);
+  // Tick once a second while a timer is actually running, so elapsed time stays
+  // live. Paused timers do not move, and we stop ticking entirely while a modal
+  // is open: repainting the list behind a full screen overlay every second is
+  // exactly the kind of thing that makes the whole browser feel sluggish.
+  const anyRunning = tasks.some((t) => isRunning(t, board));
+  const modalOpen = stopModal !== null || taskModal !== null || poolModal !== null;
   useEffect(() => {
-    if (!anyWorking) return;
+    if (!anyRunning || modalOpen) return;
     const id = setInterval(() => setTick((n) => n + 1), 1000);
     return () => clearInterval(id);
-  }, [anyWorking]);
+  }, [anyRunning, modalOpen]);
 
   const subtasksOf = (id) => tasks.filter((t) => t.parentId === id).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   const matchesQuery = (t) => {
@@ -83,22 +80,22 @@ export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard
 
   const completeTask = (task, e) => {
     const wasDone = !!(task.completed || {})[board];
-    const startMs = (task.working || {})[board];
-    const logSecs = (!wasDone && startMs != null) ? Math.round((Date.now() - startMs) / 1000) : 0;
+    const logSecs = !wasDone ? elapsedSecs(task, board) : 0;
     setTasks((prev) => {
       const cur = prev.find((t) => t.id === task.id) || task;
       const done = !!(cur.completed || {})[board];
       const comp = { ...(cur.completed || {}) };
-      const work = { ...(cur.working || {}) };
+      const cleared = clearWork(cur, board);
+      const work = cleared.working, accs = cleared.acc;
       if (done) { delete comp[board]; }
-      else { comp[board] = todayStr(); if (work[board] != null) delete work[board]; }
+      else { comp[board] = todayStr(); }
       let spawnedNext = cur.spawnedNext;
       let nextInstance = null;
       if (!done && cur.repeat && !cur.spawnedNext) {
         spawnedNext = true;
-        nextInstance = { ...cur, id: uid(), completed: {}, working: {}, spawnedNext: false, createdDate: todayStr(), dueDate: advanceDate(cur.dueDate, cur.repeat), order: prev.length + 1 };
+        nextInstance = { ...cur, id: uid(), completed: {}, working: {}, acc: {}, spawnedNext: false, createdDate: todayStr(), dueDate: advanceDate(cur.dueDate, cur.repeat), order: prev.length + 1 };
       }
-      let next = prev.map((t) => t.id === cur.id ? { ...t, completed: comp, working: work, spawnedNext } : t);
+      let next = prev.map((t) => t.id === cur.id ? { ...t, completed: comp, working: work, acc: accs, spawnedNext } : t);
       if (nextInstance) next = [...next, nextInstance];
       return next;
     });
@@ -114,32 +111,33 @@ export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard
     fireConfetti(r ? r.left + r.width / 2 : undefined, r ? r.top : undefined);
   };
 
-  // Pick the one task you are working on right now. Starting one stops any other.
+  // Only one task runs at a time. Starting another pauses the one before it
+  // rather than banking its time, so the session stays open and you can still
+  // trim it when you finally stop.
   const startWorking = (task) => {
     const now = Date.now();
-    const prevWorking = tasks.find((t) => t.id !== task.id && t.working && t.working[me.id] != null);
-    if (prevWorking) { const secs = Math.round((now - prevWorking.working[me.id]) / 1000); if (secs > 0 && onWorkEnd) onWorkEnd({ userId: me.id, taskId: prevWorking.id, seconds: secs }); }
     setTasks((prev) => prev.map((t) => {
-      if (t.id === task.id) return { ...t, working: { ...(t.working || {}), [me.id]: now } };
-      if (t.working && t.working[me.id] != null) { const w = { ...t.working }; delete w[me.id]; return { ...t, working: w }; }
+      if (t.id === task.id) return resumeWork(t, me.id, now);
+      if (isRunning(t, me.id)) return pauseWork(t, me.id, now);
       return t;
     }));
     if (onWorkStart) onWorkStart();
   };
-  const stopWorking = (task) => {
-    const start = task.working && task.working[me.id];
-    if (start != null) { const secs = Math.round((Date.now() - start) / 1000); if (secs > 0 && onWorkEnd) onWorkEnd({ userId: me.id, taskId: task.id, seconds: secs }); }
+  const pauseWorking = (task) => setTasks((prev) => prev.map((t) => t.id === task.id ? pauseWork(t, me.id) : t));
+  const resumeWorking = (task) => {
+    const now = Date.now();
     setTasks((prev) => prev.map((t) => {
-      if (t.id !== task.id) return t;
-      const w = { ...(t.working || {}) }; delete w[me.id];
-      return { ...t, working: w };
+      if (t.id === task.id) return resumeWork(t, me.id, now);
+      if (isRunning(t, me.id)) return pauseWork(t, me.id, now);
+      return t;
     }));
+    if (onWorkStart) onWorkStart();
   };
 
   // Stop working and (optionally) mark done + post a progress update, in one pass.
-  const finishStop = (task, { note = "", markDone = false, post = false }) => {
-    const start = task.working && task.working[me.id];
-    const secs = start != null ? Math.round((Date.now() - start) / 1000) : 0;
+  // `seconds` comes from the popup, already clamped to at most the tracked time.
+  const finishStop = (task, { note = "", markDone = false, post = false, seconds = null }) => {
+    const secs = seconds != null ? Math.max(0, Math.round(seconds)) : elapsedSecs(task, me.id);
     if (secs > 0 && onWorkEnd) onWorkEnd({ userId: me.id, taskId: task.id, seconds: secs });
     const alreadyDone = !!(task.completed || {})[board];
     const willDone = markDone && !alreadyDone;
@@ -149,19 +147,20 @@ export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard
       let nextInstance = null;
       if (willDone && cur.repeat && !cur.spawnedNext) {
         spawnedNext = true;
-        nextInstance = { ...cur, id: uid(), completed: {}, working: {}, spawnedNext: false, createdDate: todayStr(), dueDate: advanceDate(cur.dueDate, cur.repeat), order: prev.length + 1 };
+        nextInstance = { ...cur, id: uid(), completed: {}, working: {}, acc: {}, spawnedNext: false, createdDate: todayStr(), dueDate: advanceDate(cur.dueDate, cur.repeat), order: prev.length + 1 };
       }
       let next = prev.map((t) => {
         if (t.id !== cur.id) return t;
-        const w = { ...(t.working || {}) }; delete w[me.id];
+        const cleared = clearWork(t, me.id);
         const comp = { ...(t.completed || {}) }; if (willDone) comp[board] = todayStr();
-        return { ...t, working: w, completed: comp, spawnedNext };
+        return { ...cleared, completed: comp, spawnedNext };
       });
       if (nextInstance) next = [...next, nextInstance];
       return next;
     });
     if (willDone) fireConfetti();
-    if (post && onUpdate) onUpdate({ taskId: task.id, taskTitle: task.title, note, done: willDone || alreadyDone });
+    // Private tasks never reach the shared Updates feed, whatever was ticked.
+    if (post && !isPriv(task) && onUpdate) onUpdate({ taskId: task.id, taskTitle: task.title, note, done: willDone || alreadyDone, isPrivate: false });
     setStopModal(null);
   };
 
@@ -218,7 +217,7 @@ export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard
         <button className={"tasks-switch-btn " + (view === "log" ? "on" : "")} onClick={() => setView("log")}>Updates{unreadUpdates > 0 && <span className="nav-badge">{unreadUpdates}</span>}</button>
       </div>
       {view === "log" ? (
-        <UpdateLog updates={updates} users={users} me={me} seenSnapshot={seenSnapshot} onEdit={onEditUpdate} onDelete={onDeleteUpdate} />
+        <UpdateLog updates={updates} tasks={tasks} users={users} me={me} seenSnapshot={seenSnapshot} onEdit={onEditUpdate} onDelete={onDeleteUpdate} />
       ) : (
       <>
       <PageHead title="Tasks" subtitle="Assign work, earn points, settle the score.">
@@ -278,13 +277,15 @@ export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard
             const creator = users.find((u) => u.id === t.creatorId);
             const both = (t.assignees || []).length > 1;
             const dueSoon = t.dueDate && !done && dateDiff(t.dueDate, todayStr()) <= 1;
-            const workingStart = t.working && t.working[board];
+            const running = isRunning(t, board);
+            const paused = isPaused(t, board);
+            const active = running || paused;
             const subs = subtasksOf(t.id);
             const subDone = subs.filter((s) => (s.completed || {})[board]).length;
             const isCollapsed = collapsed.has(t.id);
             const showKids = !done && (addingSub === t.id || (subs.length > 0 && (!isCollapsed || q.length > 0)));
             return (
-              <Card className={"task-card " + (done ? "task-done " : "") + (workingStart ? "task-working" : "")}>
+              <Card className={"task-card " + (done ? "task-done " : "") + (running ? "task-working" : paused ? "task-paused" : "")}>
                 <div className="task-row">
                   <button className="drag-handle" {...ctx.handle}><GripVertical size={18} /></button>
                   <button className={"task-check " + (done ? "on" : "")} onClick={(e) => completeTask(t, e)} style={done && boardUser ? { background: boardUser.color, borderColor: boardUser.color } : {}}>
@@ -311,9 +312,16 @@ export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard
                   </div>
                   {!done && (
                     <div className="work-ctrl">
-                      {workingStart ? (
+                      {active ? (
                         <>
-                          <span className="work-time" title="Time on this task"><Timer size={13} /> {fmtElapsed(Date.now() - workingStart)}</span>
+                          <span className={"work-time " + (paused ? "is-paused" : "")} title={paused ? "Paused" : "Time on this task"}>
+                            <Timer size={13} /> {fmtElapsed(elapsedMs(t, board))}
+                          </span>
+                          {isMyBoard && (
+                            running
+                              ? <IconBtn className="work-pause" onClick={() => pauseWorking(t)} title="Pause"><Pause size={15} /></IconBtn>
+                              : <IconBtn className="work-resume" onClick={() => resumeWorking(t)} title="Resume"><Play size={15} /></IconBtn>
+                          )}
                           {isMyBoard && <IconBtn className="work-stop" onClick={() => setStopModal(t)} title="Stop"><Square size={15} /></IconBtn>}
                         </>
                       ) : (isMyBoard && (
@@ -382,17 +390,19 @@ export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard
         onClose={() => setPoolModal(null)} onSave={savePool} onDelete={removeTask} />
       <StopModal open={stopModal !== null} task={stopModal} me={me}
         onClose={() => setStopModal(null)}
-        onPost={(note, markDone) => finishStop(stopModal, { note, markDone, post: true })}
-        onSkip={() => finishStop(stopModal, { post: false })} />
+        onPost={(res) => finishStop(stopModal, { ...res, post: true })}
+        onSkip={(res) => finishStop(stopModal, { ...res, post: false })} />
     </div>
   );
 }
 
-function UpdateLog({ updates, users, me, seenSnapshot, onEdit, onDelete }) {
+function UpdateLog({ updates, tasks, users, me, seenSnapshot, onEdit, onDelete }) {
   const [editId, setEditId] = useState(null);
   const [draft, setDraft] = useState("");
   const [draftDone, setDraftDone] = useState(false);
-  const list = (updates || []).slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  // Company work only. Anything tied to a private task is filtered out here too,
+  // so old entries and tasks made private later both disappear from the feed.
+  const list = publicUpdates(updates, tasks).slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   const startEdit = (u) => { setEditId(u.id); setDraft(u.note || ""); setDraftDone(!!u.done); };
   const saveEdit = () => { if (onEdit) onEdit(editId, { note: draft.trim(), done: draftDone }); setEditId(null); };
   return (

@@ -164,6 +164,72 @@ export function GlobalStyle() {
     .stage-del { width: 34px; height: 34px; border: 1.5px solid var(--line); background: var(--surface); border-radius: 8px; color: #ff3b30; cursor: pointer; display: grid; place-items: center; flex: none; }
     .stage-del:disabled { opacity: 0.3; cursor: default; }
     .stage-add { display: inline-flex; align-items: center; gap: 7px; margin-top: 10px; border: 1.5px dashed var(--line); background: none; color: var(--ink-2); border-radius: 10px; padding: 10px 14px; font-size: 13px; cursor: pointer; width: 100%; justify-content: center; }
+
+    /* Daily planner */
+    .daily-head-btns { display: flex; align-items: center; gap: 8px; }
+    .daily-icon-btn { width: 38px; height: 38px; border-radius: 11px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); display: grid; place-items: center; cursor: pointer; flex: none; }
+    .daily-icon-btn:hover { color: var(--blue); border-color: var(--blue); }
+    .daily-plan-card { display: flex; flex-direction: column; gap: 12px; }
+    .daily-workhours { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--ink-2); }
+    .daily-fromsched { font-size: 11px; color: var(--ink-3); }
+    .daily-focus { display: flex; flex-direction: column; gap: 8px; }
+    .daily-focus-lab { font-size: 12px; color: var(--ink-3); }
+    .daily-focus-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+    /* Calendar grid */
+    .daily-cal-card { padding: 12px 12px 12px 6px; }
+    .daily-cal { position: relative; }
+    .daily-cal-body { position: relative; margin-left: 52px; height: 100%; }
+    .daily-hour { position: absolute; left: -52px; right: 0; height: 0; }
+    .daily-hour-lab { position: absolute; left: 0; top: -7px; width: 46px; text-align: right; font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+    .daily-hour-line { position: absolute; left: 52px; right: 0; top: 0; border-top: 1px solid var(--line-2); }
+    .daily-now { position: absolute; left: -6px; right: 0; height: 0; z-index: 4; pointer-events: none; }
+    .daily-now-dot { position: absolute; left: 0; top: -4px; width: 8px; height: 8px; border-radius: 50%; background: #ff3b30; }
+    .daily-now-line { position: absolute; left: 8px; right: 0; top: 0; border-top: 2px solid #ff3b30; }
+    .daily-ev { position: absolute; box-sizing: border-box; background: var(--surface); border: 1px solid var(--line-2); border-left: 3px solid var(--blue); border-radius: 9px; padding: 4px 8px; overflow: hidden; cursor: grab; box-shadow: var(--shadow); touch-action: none; z-index: 3; }
+    .daily-ev:hover { border-color: var(--blue); }
+    .daily-ev.is-break { background: var(--line-2); box-shadow: none; }
+    .daily-ev.dragging { opacity: 0.9; cursor: grabbing; box-shadow: 0 8px 22px rgba(0,0,0,0.25); z-index: 6; }
+    .daily-ev-time { font-size: 10.5px; color: var(--ink-3); white-space: nowrap; }
+    .daily-ev-title { font-size: 13px; font-weight: 500; color: var(--ink); display: flex; align-items: center; gap: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .daily-ev-lock { color: var(--ink-3); flex: none; }
+    .daily-ev-resize { position: absolute; left: 0; right: 0; bottom: 0; height: 9px; cursor: ns-resize; }
+    .daily-ev-resize::after { content: ""; position: absolute; left: 50%; bottom: 2px; transform: translateX(-50%); width: 22px; height: 3px; border-radius: 999px; background: transparent; }
+    .daily-ev:hover .daily-ev-resize::after { background: var(--line); }
+    .daily-cal-empty { text-align: center; font-size: 13px; color: var(--ink-3); padding: 14px; }
+
+    .daily-two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 480px) { .daily-two { grid-template-columns: 1fr; } }
+    .daily-eng-pick { display: flex; flex-wrap: wrap; gap: 6px; }
+    .daily-eng-chip { border: 1.5px solid var(--line); background: var(--surface); color: var(--ink-2); font-size: 12.5px; padding: 7px 12px; border-radius: 999px; cursor: pointer; }
+    .daily-eng-chip.on { background: rgba(0,113,227,0.05); }
+    .daily-check { display: flex; align-items: center; gap: 9px; font-size: 13.5px; color: var(--ink); cursor: pointer; margin: 4px 0; line-height: 1.4; }
+    .daily-time-in { display: flex; align-items: center; gap: 6px; }
+    .daily-time-in select { border: 1.5px solid var(--line); border-radius: 9px; padding: 9px 10px; background: var(--surface); color: var(--ink); font-size: 15px; }
+    .daily-key-hint { font-size: 13px; color: var(--ink-3); line-height: 1.5; margin: 0 0 14px; }
+
+    /* Assistant chat */
+    .daily-assistant-fab { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 14px; border: none; border-radius: 14px; background: linear-gradient(135deg, #5e5ce6, #0071e3); color: #fff; font-size: 15px; font-weight: 500; cursor: pointer; box-shadow: 0 6px 18px rgba(0,113,227,0.3); }
+    .chat-scrim { position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 80; display: flex; justify-content: flex-end; animation: moreFade .18s ease; }
+    .chat-panel { width: 420px; max-width: 100%; height: 100%; background: var(--surface); display: flex; flex-direction: column; box-shadow: -10px 0 40px rgba(0,0,0,0.25); animation: chatIn .24s cubic-bezier(.2,.8,.2,1); }
+    @keyframes chatIn { from { transform: translateX(100%); } }
+    .chat-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--line-2); }
+    .chat-title { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 500; color: var(--ink); }
+    .chat-head-btns { display: flex; align-items: center; gap: 10px; }
+    .chat-head-btns button { border: none; background: none; color: var(--ink-3); cursor: pointer; font-size: 13px; display: grid; place-items: center; }
+    .chat-head-btns button:hover { color: var(--ink); }
+    .chat-body { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+    .chat-intro { color: var(--ink-2); font-size: 14px; line-height: 1.55; }
+    .chat-key-btn { display: inline-flex; align-items: center; gap: 7px; margin-top: 12px; border: 1.5px solid var(--blue); background: rgba(0,113,227,0.06); color: var(--blue); border-radius: 10px; padding: 9px 14px; font-size: 13px; cursor: pointer; }
+    .chat-msg { max-width: 85%; padding: 10px 13px; border-radius: 14px; font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
+    .chat-msg.user { align-self: flex-end; background: var(--blue); color: #fff; border-bottom-right-radius: 4px; }
+    .chat-msg.assistant { align-self: flex-start; background: var(--line-2); color: var(--ink); border-bottom-left-radius: 4px; }
+    .chat-typing { display: inline-flex; align-items: center; gap: 7px; color: var(--ink-3); }
+    .chat-input { display: flex; align-items: flex-end; gap: 8px; padding: 12px; border-top: 1px solid var(--line-2); }
+    .chat-input textarea { flex: 1; resize: none; max-height: 120px; border: 1.5px solid var(--line); border-radius: 12px; padding: 11px 13px; background: var(--surface); color: var(--ink); font-size: 14px; font-family: inherit; line-height: 1.4; }
+    .chat-send { width: 42px; height: 42px; border-radius: 12px; border: none; background: var(--blue); color: #fff; display: grid; place-items: center; cursor: pointer; flex: none; }
+    .chat-send:disabled { opacity: 0.4; cursor: default; }
+    @media (max-width: 620px) { .chat-scrim { justify-content: stretch; } .chat-panel { width: 100%; } }
     .avatar-status.working { background: var(--blue); animation: pulseBlue 1.8s ease-out infinite; }
     @keyframes pulseBlue { 0% { box-shadow: 0 0 0 0 rgba(0,113,227,0.5); } 70% { box-shadow: 0 0 0 6px rgba(0,113,227,0); } 100% { box-shadow: 0 0 0 0 rgba(0,113,227,0); } }
     @media (min-width: 820px) { .more-scrim { display: none !important; } }
@@ -415,6 +481,27 @@ export function GlobalStyle() {
     .stop-task { display: flex; align-items: center; gap: 7px; font-size: 14px; color: var(--ink-2); margin: 0 0 12px; }
     .stop-done { display: flex; align-items: center; gap: 9px; font-size: 14px; color: var(--ink); margin: 4px 0 4px; cursor: pointer; }
     .stop-done input { width: 17px; height: 17px; }
+    .stop-private { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--ink-2); background: rgba(142,142,147,0.12); border-radius: 12px; padding: 11px 13px; margin: 0 0 12px; }
+
+    /* Stop popup: time to log, trimmable downwards only */
+    .stop-time { background: var(--surface-2, rgba(0,0,0,0.03)); border: 1px solid var(--line); border-radius: 14px; padding: 12px 13px; margin-bottom: 14px; }
+    html.crica-dark .stop-time { background: rgba(255,255,255,0.05); }
+    .stop-time-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .stop-time-val { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.15; }
+    .stop-time-lab { font-size: 11.5px; color: var(--ink-3); font-weight: 500; margin-top: 2px; }
+    .stop-adjust-btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); border-radius: 10px; padding: 7px 11px; font-size: 12.5px; font-weight: 600; cursor: pointer; flex-shrink: 0; transition: color .15s, border-color .15s; }
+    .stop-adjust-btn:hover { border-color: var(--blue); color: var(--blue); }
+    .stop-adjust-btn.on { border-color: var(--blue); color: var(--blue); background: rgba(0,113,227,0.08); }
+    .stop-adjust { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+    .stop-hm { display: flex; align-items: center; gap: 8px; }
+    .stop-hm label { display: inline-flex; align-items: center; gap: 5px; }
+    .stop-hm input { width: 62px; padding: 8px 9px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); font-size: 15px; font-weight: 600; text-align: center; font-variant-numeric: tabular-nums; }
+    .stop-hm span { font-size: 13px; color: var(--ink-3); font-weight: 600; }
+    .stop-reset { margin-left: auto; display: inline-flex; align-items: center; gap: 5px; border: none; background: none; color: var(--blue); font-size: 12.5px; font-weight: 600; cursor: pointer; padding: 6px; }
+    .stop-cuts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+    .stop-cut { border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); border-radius: 9px; padding: 6px 11px; font-size: 12.5px; font-weight: 600; cursor: pointer; font-variant-numeric: tabular-nums; transition: color .15s, border-color .15s; }
+    .stop-cut:hover { border-color: var(--blue); color: var(--blue); }
+    .stop-hint { font-size: 11.5px; color: var(--ink-3); margin: 10px 0 0; line-height: 1.45; }
     .card { background: var(--surface); border: 1px solid var(--line-2); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); }
     .card-title { display: flex; align-items: center; gap: 7px; font-size: 15px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 12px; }
     .empty { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; color: var(--ink-3); padding: 34px 18px; }
@@ -460,7 +547,12 @@ export function GlobalStyle() {
     .ring-sub { font-size: 10px; color: var(--ink-3); font-weight: 500; }
 
     /* Modal */
-    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.35); backdrop-filter: blur(4px); z-index: 100; display: flex; align-items: flex-end; justify-content: center; padding: 0; animation: fade .2s; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--ink); }
+    /* No backdrop-filter here. A full viewport blur forces the browser to
+       re-filter everything painted underneath on every frame, and the page
+       below keeps repainting (live timers, pulsing dots), which dragged the
+       whole browser down whenever a popup was open. A plain dim costs nothing.
+       'contain' and 'isolation' keep the modal's own repaints to itself. */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 100; display: flex; align-items: flex-end; justify-content: center; padding: 0; animation: fade .2s; isolation: isolate; contain: layout paint; overscroll-behavior: contain; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: var(--ink); }
     @media (min-width: 600px) { .modal-overlay { align-items: center; padding: 20px; } }
     .modal { background: var(--surface); width: 100%; max-width: 460px; border-radius: 22px 22px 0 0; max-height: 90vh; overflow-y: auto; animation: sheet .3s cubic-bezier(.2,.8,.2,1); }
     @media (min-width: 600px) { .modal { border-radius: 22px; } }
@@ -698,8 +790,14 @@ export function GlobalStyle() {
     .work-start:hover { border-color: var(--blue); background: rgba(0,113,227,0.08); transform: scale(1.05); }
     .work-time { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 500; color: var(--blue); background: rgba(0,113,227,0.1); padding: 5px 9px; border-radius: 9px; font-variant-numeric: tabular-nums; white-space: nowrap; animation: workPulse 2s ease-in-out infinite; }
     @keyframes workPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
+    /* Paused reads as held, not live: no pulsing, muted colour. */
+    .work-time.is-paused { color: var(--ink-3); background: rgba(142,142,147,0.15); animation: none; }
     .work-stop { color: #ff3b30; }
+    .work-pause { color: var(--ink-2); }
+    .work-resume { color: var(--blue); }
+    .task-paused { border-color: rgba(142,142,147,0.35); }
     html.crica-dark .work-time { background: rgba(0,113,227,0.18); }
+    html.crica-dark .work-time.is-paused { background: rgba(255,255,255,0.1); }
 
     /* Habit extras */
     .habit-last { font-size: 11.5px; color: var(--ink-3); margin-top: 6px; font-weight: 500; }
@@ -800,7 +898,7 @@ export function GlobalStyle() {
     .focus-screen { position: fixed; inset: 0; z-index: 80; display: flex; flex-direction: column; align-items: center; justify-content: center;
       padding: 28px; text-align: center; color: var(--ink);
       background: radial-gradient(120% 120% at 50% 0%, rgba(175,82,222,0.16), var(--bg) 55%);
-      backdrop-filter: blur(8px); animation: focusIn .25s ease; }
+      contain: layout paint; animation: focusIn .25s ease; }
     @keyframes focusIn { from { opacity: 0; } to { opacity: 1; } }
     .focus-close { position: absolute; top: 18px; right: 18px; width: 40px; height: 40px; border-radius: 50%; border: none;
       background: var(--surface); color: var(--ink-2); cursor: pointer; display: grid; place-items: center; box-shadow: var(--shadow); }

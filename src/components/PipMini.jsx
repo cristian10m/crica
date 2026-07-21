@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Pause, Play, Square, Clock } from "lucide-react";
 import { earnedPoints } from "../lib/focus";
+import { isRunning, isActive, elapsedMs } from "../lib/work";
 
 // Document Picture-in-Picture: a real floating, always-on-top window (Chrome and
 // Edge on desktop), like a music mini player. Unsupported elsewhere, where it just
@@ -72,16 +73,20 @@ const fmtElapsed = (ms) => {
   return `${ss}s`;
 };
 
-export function PipMini({ focus, workingTitle, workingStart, onPause, onResume, onEnd, onStopWork }) {
+export function PipMini({ focus, workingTask, workingUserId, onPause, onResume, onEnd, onPauseWork, onResumeWork, onStopWork }) {
   const [, setT] = useState(0);
   useEffect(() => { const id = setInterval(() => setT((n) => n + 1), 1000); return () => clearInterval(id); }, []);
   const focusActive = focus && focus.phase !== "done";
   const running = focus && focus.phase === "running";
+  const workOn = isActive(workingTask, workingUserId);
+  const workRunning = isRunning(workingTask, workingUserId);
+  const workMs = workOn ? elapsedMs(workingTask, workingUserId) : 0;
+  const workTitle = workingTask ? workingTask.title : "";
 
   return (
     <div className="pip">
-      {focusActive && workingStart != null && (
-        <div className="pip-task"><Clock size={13} /> {workingTitle} · {fmtElapsed(Date.now() - workingStart)}</div>
+      {focusActive && workOn && (
+        <div className="pip-task"><Clock size={13} /> {workTitle} · {fmtElapsed(workMs)}{workRunning ? "" : " (paused)"}</div>
       )}
       {focusActive ? (
         <div className="pip-main">
@@ -94,11 +99,16 @@ export function PipMini({ focus, workingTitle, workingStart, onPause, onResume, 
             <button className="pip-btn danger" onClick={onEnd}><Square size={14} /> End</button>
           </div>
         </div>
-      ) : workingStart != null ? (
+      ) : workOn ? (
         <div className="pip-main">
-          <div className="pip-time">{fmtElapsed(Date.now() - workingStart)}</div>
-          <div className="pip-sub">on {workingTitle}</div>
-          <div className="pip-controls"><button className="pip-btn danger" onClick={onStopWork}><Square size={14} /> Stop</button></div>
+          <div className="pip-time">{fmtElapsed(workMs)}</div>
+          <div className="pip-sub">{workRunning ? "on" : "paused ·"} {workTitle}</div>
+          <div className="pip-controls">
+            {workRunning
+              ? <button className="pip-btn" onClick={onPauseWork}><Pause size={14} /> Pause</button>
+              : <button className="pip-btn primary" onClick={onResumeWork}><Play size={14} /> Resume</button>}
+            <button className="pip-btn danger" onClick={onStopWork}><Square size={14} /> Stop</button>
+          </div>
         </div>
       ) : null}
     </div>
