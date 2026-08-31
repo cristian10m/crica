@@ -55,7 +55,8 @@ export function Dashboard({ users: allUsers, me, habits, tasks, finance, focus =
   const allTime = users.map((u) => totalPoints(u.id, habits, tasks, focus, work));
   const myFocusSecWeek = focusSecondsInRange(me.id, weekFrom, weekTo, focus);
 
-  const tasksDoneWeek = users.map((u) => tasks.filter((t) => { const c = (t.completed || {})[u.id]; return c && c >= weekFrom && c <= weekTo; }).length);
+  // The other person's private tasks stay off your screen, even as a count.
+  const tasksDoneWeek = users.map((u) => tasks.filter((t) => { if (u.id !== me.id && (t.isPrivate || t.private)) return false; const c = (t.completed || {})[u.id]; return c && c >= weekFrom && c <= weekTo; }).length);
 
   const habitDoneWeek = users.map((u) => {
     let total = 0, done = 0;

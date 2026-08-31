@@ -343,6 +343,8 @@ export default function App() {
       if (!t.dueDate) return;
       (t.assignees || []).forEach((aid) => {
         if ((t.completed || {})[aid]) return;
+        // Private tasks are personal: their titles never show on anyone else's screen.
+        if (isPrivateTask(t) && aid !== me.id) return;
         const diff = dateDiff(t.dueDate, todayStr());
         if (diff <= 1) {
           const u = users.find((x) => x.id === aid);

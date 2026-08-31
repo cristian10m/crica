@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ChevronLeft, ChevronRight, CalendarDays, Crown, CheckSquare, Repeat, Check, Timer } from "lucide-react";
 import { Card, IconBtn, Avatar, PageHead } from "../components/ui";
 import { pointsOnDay, focusSecondsInRange } from "../lib/points";
+import { isPrivateTask } from "../lib/work";
 import { addDays, todayStr, dateDiff, prettyDate } from "../lib/dates";
 import { Schedule } from "./Schedule";
 
@@ -13,7 +14,10 @@ export function DailyReport({ users: allUsers, me, habits, tasks, focus = [], wo
   const canForward = dateDiff(todayStr(), day) > 0;
 
   const data = users.map((u) => {
-    const tasksDone = tasks.filter((t) => !t.parentId && (t.completed || {})[u.id] === day);
+    // Private tasks are personal. You still see your own here, but the other
+    // person's never appear on your screen, in the list or in the count.
+    const tasksDone = tasks.filter((t) => !t.parentId && (t.completed || {})[u.id] === day)
+      .filter((t) => u.id === me.id || !isPrivateTask(t));
     const habitsDone = habits.filter((h) => h.ownerId === u.id && (h.completions || {})[day]);
     const focusMin = Math.round(focusSecondsInRange(u.id, day, day, focus) / 60);
     const pts = pointsOnDay(u.id, day, habits, tasks, focus, work);
