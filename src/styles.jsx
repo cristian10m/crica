@@ -66,13 +66,93 @@ export function GlobalStyle() {
     .header-me { border: none; background: transparent; cursor: pointer; padding: 0; border-radius: 50%; margin-left: auto; }
 
     @media (min-width: 820px) {
-      .top-nav { display: flex; }
-      .header-brand { position: static; transform: none; }
-      .header-me { margin-left: 0; }
+      .app-root { display: flex; align-items: stretch; padding-bottom: 0; }
+      .app-body { flex: 1; min-width: 0; }
+      .app-header { display: none; }
       .bottom-nav { display: none !important; }
-      .app-root { padding-bottom: 0; }
+      button.weekgoal-slim { display: none; }
       .app-main { max-width: 980px; margin: 0 auto; }
+      aside.sidebar { display: flex; }
     }
+
+    /* Sidebar (desktop) */
+    .sidebar { display: none; position: sticky; top: 0; z-index: 50; height: 100vh; height: 100dvh; width: 232px; flex: none;
+      flex-direction: column; gap: 4px; padding: 16px 12px 14px; background: var(--surface); border-right: 1px solid var(--line);
+      transition: width .25s cubic-bezier(.2,.8,.2,1); overflow: hidden; }
+    .sidebar.is-collapsed { width: 74px; }
+    .sidebar-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 0 4px 14px; }
+    .is-collapsed .sidebar-head { flex-direction: column; gap: 10px; padding-bottom: 12px; }
+    .sidebar-brand { border: none; background: none; padding: 2px; cursor: pointer; display: flex; align-items: center; min-width: 0; }
+    .sidebar-collapse { width: 28px; height: 28px; flex: none; border: none; border-radius: 8px; background: transparent; color: var(--ink-3);
+      display: grid; place-items: center; cursor: pointer; transition: background .15s, color .15s; }
+    .sidebar-collapse:hover { background: var(--line-2); color: var(--ink); }
+    .sidebar-nav { display: flex; flex-direction: column; gap: 2px; overflow-y: auto; overflow-x: hidden; margin: 0 -4px; padding: 0 4px; }
+    .sidebar-item { display: flex; align-items: center; gap: 11px; padding: 10px 12px; border: none; background: transparent; color: var(--ink-2);
+      border-radius: 11px; font-size: 14px; font-weight: 500; cursor: pointer; white-space: nowrap; transition: background .15s, color .15s; }
+    .sidebar-item:hover { background: var(--line-2); color: var(--ink); }
+    .sidebar-item.on { background: var(--blue); color: #fff; box-shadow: 0 2px 8px rgba(0,113,227,0.35); }
+    .is-collapsed .sidebar-item { justify-content: center; padding: 10px 0; }
+    .is-collapsed .sidebar-item-lab { display: none; }
+    .sidebar-foot { margin-top: auto; display: flex; flex-direction: column; gap: 10px; padding-top: 12px; border-top: 1px solid var(--line-2); }
+    .sidebar-me { display: flex; align-items: center; gap: 10px; border: none; background: transparent; border-radius: 12px; padding: 7px 8px; cursor: pointer; transition: background .15s; }
+    .sidebar-me:hover, .sidebar-me.on { background: var(--line-2); }
+    .is-collapsed .sidebar-me { justify-content: center; padding: 7px 0; }
+    .sidebar-me-main { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; min-width: 0; }
+    .is-collapsed .sidebar-me-main { display: none; }
+    .sidebar-me-name { font-size: 13.5px; font-weight: 600; color: var(--ink); max-width: 120px; overflow: hidden; text-overflow: ellipsis; }
+
+    /* Weekly hours goal bar */
+    .weekgoal { display: flex; flex-direction: column; gap: 8px; padding: 11px 12px; border: 1px solid transparent; border-radius: 13px;
+      background: var(--line-2); cursor: pointer; text-align: left; font-family: inherit; transition: border-color .15s; }
+    .weekgoal:hover { border-color: var(--blue); }
+    .weekgoal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .weekgoal-lab { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 700; color: var(--ink-3); text-transform: uppercase; letter-spacing: .06em; }
+    .weekgoal.hit .weekgoal-lab { color: #2ba84a; }
+    html.crica-dark .weekgoal.hit .weekgoal-lab { color: #45d869; }
+    .weekgoal-val { font-size: 12.5px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .weekgoal-val i, .weekgoal-slim-val i { font-style: normal; color: var(--ink-3); font-weight: 500; }
+    .weekgoal-track { position: relative; display: block; height: 10px; border-radius: 999px; background: rgba(0,0,0,0.08); overflow: hidden; }
+    html.crica-dark .weekgoal-track { background: rgba(255,255,255,0.1); }
+    .weekgoal-fill { position: relative; display: block; height: 100%; min-width: 4px; border-radius: 999px; overflow: hidden;
+      background: linear-gradient(90deg, var(--blue), #5AC8FA); transition: width .8s cubic-bezier(.2,.8,.2,1); }
+    .weekgoal-fill::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%);
+      background: linear-gradient(105deg, transparent 38%, rgba(255,255,255,0.5) 50%, transparent 62%); animation: goalShine 2.8s ease-in-out infinite; }
+    .weekgoal-fill.flat::after { content: none; }
+    @keyframes goalShine { 0% { transform: translateX(-100%); } 55%, 100% { transform: translateX(100%); } }
+    .weekgoal.hit .weekgoal-fill, .weekgoal-slim.hit .weekgoal-fill { background: linear-gradient(90deg, #34C759, #30D158); }
+    .weekgoal.hit .weekgoal-track { box-shadow: 0 0 0 1px rgba(52,199,89,0.35); }
+    .weekgoal-other { display: flex; align-items: center; gap: 7px; }
+    .weekgoal-track.mini { height: 5px; flex: 1; }
+    .weekgoal-other-name, .weekgoal-other-val { font-size: 10.5px; font-weight: 600; color: var(--ink-3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .weekgoal-other-name { max-width: 64px; overflow: hidden; text-overflow: ellipsis; }
+    .weekgoal.empty { flex-direction: row; align-items: center; gap: 8px; background: transparent; border: 1.5px dashed var(--line); color: var(--ink-3); font-size: 12.5px; font-weight: 500; justify-content: center; padding: 10px; }
+    .weekgoal.empty:hover { color: var(--blue); border-color: var(--blue); }
+    .weekgoal.compact { align-items: center; gap: 6px; padding: 10px 6px; }
+    .weekgoal.compact .weekgoal-track { width: 100%; height: 6px; }
+    .weekgoal-pct { font-size: 10.5px; font-weight: 700; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+    .weekgoal.compact.hit .weekgoal-pct { color: #2ba84a; }
+
+    /* Slim strip under the mobile header */
+    .weekgoal-slim { display: flex; align-items: center; gap: 10px; width: 100%; padding: 8px 16px; border: none; border-bottom: 1px solid var(--line);
+      background: var(--bg); color: var(--ink-3); cursor: pointer; font-family: inherit; }
+    .weekgoal-slim.hit { color: #2ba84a; }
+    .weekgoal-slim .weekgoal-track.slim { flex: 1; height: 7px; }
+    .weekgoal-slim-val { font-size: 12px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+    /* Sunday schedule prompt */
+    .sched-prompt-checks { display: flex; flex-direction: column; gap: 8px; margin: 14px 0 4px; }
+    .sched-check { display: flex; align-items: center; gap: 10px; padding: 11px 13px; border: 1.5px solid var(--line); border-radius: 12px;
+      font-size: 14px; color: var(--ink-2); cursor: pointer; transition: border-color .15s, background .15s, color .15s; }
+    .sched-check:hover { border-color: var(--ink-3); }
+    .sched-check.on { border-color: var(--blue); color: var(--ink); background: rgba(0,113,227,0.06); }
+    .sched-check input { width: 17px; height: 17px; accent-color: var(--blue); }
+    .btn:disabled { opacity: .45; cursor: default; transform: none !important; }
+
+    /* Weekly goal picker in settings */
+    .goal-custom { display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--ink-3); }
+    .goal-custom input { width: 92px; border: 1.5px solid var(--line); border-radius: 10px; padding: 9px 11px; background: var(--surface); color: var(--ink); font-size: 14px; }
+    .report-penalty { color: #ff3b30 !important; }
+    .report-penalty svg { color: #ff3b30; }
 
     /* Bottom nav */
     .bottom-nav {

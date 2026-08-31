@@ -45,10 +45,11 @@ export async function scheduleReminders({ tasks, clients, habits, me }) {
     } catch (e) { /* ignore */ }
   };
 
-  // Daily nudge to review yesterday, at the next 9:00 AM
-  const d = new Date(); d.setHours(9, 0, 0, 0);
-  let nudge = d.getTime(); if (nudge <= now) nudge += 86400000;
-  put("daily", nudge, "Crica", "New day. Take a look at yesterday's results.");
+  // Weekly nudge on Sunday at 10:00 to set next week's schedule
+  const d = new Date(); d.setHours(10, 0, 0, 0);
+  let nudge = d.getTime() + (((7 - d.getDay()) % 7) * 86400000);
+  if (nudge <= now) nudge += 7 * 86400000;
+  put("weekly-sched", nudge, "Crica", "New week ahead. Update your work schedule.");
 
   // Your unfinished tasks, on their due day at 9:00 AM
   (tasks || []).forEach((t) => {

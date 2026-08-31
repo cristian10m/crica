@@ -1,4 +1,4 @@
-import { addDays, dateDiff, startOfWeek } from "./dates";
+import { addDays, dateDiff, startOfWeek, todayStr } from "./dates";
 import { HABIT_POINTS, TASK_IMPORTANCE } from "./constants";
 
 // Habit evaluation. Daily habits use the 2 chance rule (miss one day = warning,
@@ -133,6 +133,39 @@ export function taskPointsFor(t, userId, work = []) {
   return Math.round(base * ((by[userId] || 0) / total));
 }
 
+// Miss a due date and it costs about half the task's value. Only due dates from
+// this day forward count, so shipping the feature never rewrote old balances.
+export const PENALTY_START = "2026-08-31";
+
+// The penalty one person carries for one task, or 0. A task counts as missed
+// once today is past its due date, or when it was completed after the due date.
+// Finishing late does not refund the penalty: you still earn the completion
+// points, so a late finish nets about half value.
+export function latePenaltyFor(t, userId, today = todayStr()) {
+  if (!t || !t.dueDate || t.pool || t.parentId) return 0;
+  if (t.dueDate < PENALTY_START) return 0;
+  const assignees = t.assignees || [];
+  if (!assignees.includes(userId)) return 0;
+  const done = (t.completed || {})[userId];
+  const missed = done ? done > t.dueDate : today > t.dueDate;
+  if (!missed) return 0;
+  const base = taskPoints(t);
+  if (base <= 0) return 0; // private tasks and subtasks never cost points
+  const share = assignees.length > 1 ? base / assignees.length : base;
+  return Math.max(1, Math.round(share / 2));
+}
+
+// Sum of penalties whose "missed day" (the day after the due date) falls in the
+// range, so daily and weekly views charge the loss to the right day.
+export function penaltiesInRange(userId, from, to, tasks, today = todayStr()) {
+  let p = 0;
+  (tasks || []).forEach((t) => {
+    const v = latePenaltyFor(t, userId, today);
+    if (v && (() => { const d = addDays(t.dueDate, 1); return d >= from && d <= to; })()) p += v;
+  });
+  return p;
+}
+
 export function pointsInRange(userId, from, to, habits, tasks, focus = [], work = []) {
   let pts = 0;
   habits.filter((h) => h.ownerId === userId).forEach((h) => {
@@ -140,6 +173,7 @@ export function pointsInRange(userId, from, to, habits, tasks, focus = [], work 
   });
   tasks.forEach((t) => { const c = (t.completed || {})[userId]; if (c && c >= from && c <= to) pts += taskPointsFor(t, userId, work); });
   (focus || []).forEach((f) => { if (f.userId === userId && f.date >= from && f.date <= to) pts += (f.points || 0); });
+  pts -= penaltiesInRange(userId, from, to, tasks);
   return pts;
 }
 export function pointsOnDay(userId, day, habits, tasks, focus = [], work = []) { return pointsInRange(userId, day, day, habits, tasks, focus, work); }

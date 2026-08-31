@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Camera, Check, LogOut, Trophy, Flame, CheckSquare, Repeat, Timer, Crown, Swords, TrendingUp, Zap, Trash2, Briefcase, Coins, Lock, Sparkles } from "lucide-react";
+import { Camera, Check, LogOut, Trophy, Flame, CheckSquare, Repeat, Timer, Crown, Swords, TrendingUp, Zap, Trash2, Briefcase, Coins, Lock, Sparkles, Target } from "lucide-react";
 import { Card, Btn, Field, Avatar, PageHead } from "../components/ui";
 import { hashPw } from "../lib/format";
 import { BLUE } from "../lib/constants";
@@ -189,6 +189,33 @@ function StatBox({ icon, label, value, accent }) {
   );
 }
 
+function GoalPicker({ users, me, setUsers }) {
+  const cur = me.weekGoalHours || 0;
+  const [custom, setCustom] = useState("");
+  const setGoal = (h) => {
+    const v = Math.max(0, Math.min(120, Math.round(Number(h) || 0)));
+    setUsers(users.map((u) => u.id === me.id ? { ...u, weekGoalHours: v } : u));
+    setCustom("");
+  };
+  const presets = [0, 10, 20, 30, 40];
+  return (
+    <div className="goal-picker">
+      <div className="seg-pills" style={{ marginBottom: 10 }}>
+        {presets.map((h) => (
+          <button key={h} className={"pill " + (cur === h ? "pill-on" : "")} onClick={() => setGoal(h)}>{h === 0 ? "Off" : <b>{h}h</b>}</button>
+        ))}
+      </div>
+      <div className="goal-custom">
+        <input type="number" min="1" max="120" placeholder="Custom" value={custom} onChange={(e) => setCustom(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && custom) setGoal(custom); }} />
+        <span>hours per week</span>
+        {custom && <button className="pill pill-on" onClick={() => setGoal(custom)}>Set</button>}
+      </div>
+      {cur > 0 && <p className="muted-small" style={{ marginTop: 10 }}>Current goal: {cur} hours a week. It resets every Monday.</p>}
+    </div>
+  );
+}
+
 function SelfSettings({ users, me, setUsers, onLogout, dark, setDark, notifOn, enableNotifs, hasAvatar }) {
   const [name, setName] = useState(me.name);
   const [color, setColor] = useState(me.color);
@@ -220,6 +247,12 @@ function SelfSettings({ users, me, setUsers, onLogout, dark, setDark, notifOn, e
       </Card>
 
       <Card>
+        <div className="card-title"><Target size={15} /> Weekly hours goal</div>
+        <p className="muted-small" style={{ marginTop: 0, marginBottom: 12 }}>Time you track on tasks fills a bar that stays on screen all week: in the menu on desktop, under the header on your phone. Pick a target or type your own.</p>
+        <GoalPicker users={users} me={me} setUsers={setUsers} />
+      </Card>
+
+      <Card>
         <div className="card-title">Appearance and alerts</div>
         <div className="toggle-row">
           <span>Dark mode</span>
@@ -229,7 +262,7 @@ function SelfSettings({ users, me, setUsers, onLogout, dark, setDark, notifOn, e
           <span>Desktop notifications</span>
           <button className={"toggle " + (notifOn ? "toggle-on" : "")} onClick={enableNotifs} aria-label="Enable notifications"><span className="toggle-knob" /></button>
         </div>
-        <p className="muted-small">Reminders fire for tasks and invoices due soon, plus a daily nudge. On Chrome and Edge they can arrive even when Crica is closed.</p>
+        <p className="muted-small">Reminders fire for tasks and invoices due soon, plus a Sunday nudge to set next week's schedule. On Chrome and Edge they can arrive even when Crica is closed. Missing a due date costs about half the task's points, so the deadlines are real.</p>
       </Card>
 
       <Card>

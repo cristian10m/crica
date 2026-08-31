@@ -26,7 +26,9 @@ export function Segmented({ options, value, onChange }) {
 // only when the last one closes, so nested popups cannot unlock it early.
 let openModals = 0;
 
-export function Modal({ open, onClose, title, children, wide, onSubmit }) {
+// locked: the popup cannot be dismissed by scrim, Escape, or an X. The content
+// itself must offer the way out (used for the weekly schedule prompt).
+export function Modal({ open, onClose, title, children, wide, onSubmit, locked }) {
   const downOnScrim = useRef(false);
   // Freeze the page behind the popup. Scrolling the background under a full
   // screen overlay forces the browser to repaint the whole app for nothing.
@@ -43,7 +45,7 @@ export function Modal({ open, onClose, title, children, wide, onSubmit }) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e) => {
-      if (e.key === "Escape") { onClose && onClose(); }
+      if (e.key === "Escape") { if (!locked && onClose) onClose(); }
       else if (e.key === "Enter" && onSubmit && !["TEXTAREA", "BUTTON", "SELECT"].includes(e.target.tagName)) { e.preventDefault(); onSubmit(); }
     };
     document.addEventListener("keydown", onKey);
@@ -54,12 +56,12 @@ export function Modal({ open, onClose, title, children, wide, onSubmit }) {
     <div
       className="modal-overlay"
       onPointerDown={(e) => { downOnScrim.current = e.target === e.currentTarget; }}
-      onClick={(e) => { if (e.target === e.currentTarget && downOnScrim.current && onClose) onClose(); downOnScrim.current = false; }}
+      onClick={(e) => { if (e.target === e.currentTarget && downOnScrim.current && !locked && onClose) onClose(); downOnScrim.current = false; }}
     >
       <div className={"modal " + (wide ? "modal-wide" : "")}>
         <div className="modal-head">
           <h3>{title}</h3>
-          <IconBtn onClick={onClose}><X size={18} /></IconBtn>
+          {!locked && <IconBtn onClick={onClose}><X size={18} /></IconBtn>}
         </div>
         <div className="modal-body">{children}</div>
       </div>

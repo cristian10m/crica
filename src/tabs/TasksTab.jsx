@@ -9,6 +9,7 @@ import { uid } from "../lib/format";
 import { TASK_IMPORTANCE } from "../lib/constants";
 import { isPrivateTask as isPriv, isRunning, isPaused, isActive, elapsedMs, elapsedSecs, startWork, pauseWork, resumeWork, clearWork, fmtElapsed } from "../lib/work";
 import { publicUpdates } from "../lib/updates";
+import { latePenaltyFor } from "../lib/points";
 const IMPORTANCE_RANK = { urgent: 0, high: 1, medium: 2, low: 3 };
 const rankOf = (t) => IMPORTANCE_RANK[t.importance] ?? 2;
 const REPEAT_LABEL = { daily: "Daily", weekly: "Weekly", monthly: "Monthly" };
@@ -307,6 +308,7 @@ export function TasksTab({ users, me, tasks, setTasks, clients, board: propBoard
                       {client && <span className="chip"><Building2 size={11} /> {client.name}</span>}
                       {both && <span className="chip"><Users size={11} /> Both</span>}
                       {t.dueDate && <span className={"chip " + (dueSoon ? "warn" : "")}><Clock size={11} /> {prettyDate(t.dueDate)}</span>}
+                      {(() => { const pen = latePenaltyFor(t, board); return pen > 0 ? <span className="chip danger" title="Points lost for missing the due date">-{pen} pts {done ? "late" : "overdue"}</span> : null; })()}
                     </div>
                     {t.creatorId !== board && creator && <div className="added-by">Added by {creator.name}</div>}
                   </div>

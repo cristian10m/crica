@@ -9,6 +9,8 @@ import { AlertBar } from "./components/AlertBar";
 import { FocusFab, FocusOverlay } from "./components/Focus";
 import { usePipWindow, PipMini } from "./components/PipMini";
 import { StopModal } from "./components/StopModal";
+import { Sidebar } from "./components/Sidebar";
+import { WeekGoal } from "./components/WeekGoal";
 import { createPortal } from "react-dom";
 import { LoginScreen } from "./screens/LoginScreen";
 import { DbErrorScreen } from "./screens/DbErrorScreen";
@@ -22,13 +24,13 @@ import { DocsTab } from "./tabs/DocsTab";
 import { ToolsTab } from "./tabs/ToolsTab";
 import { LeadsTab } from "./tabs/LeadsTab";
 
-import { todayStr, dateDiff, localTz, parseDate, toDateStr } from "./lib/dates";
+import { todayStr, dateDiff, localTz, parseDate, toDateStr, startOfWeek } from "./lib/dates";
 import { nextInvoiceDate } from "./lib/invoices";
 import { notify } from "./lib/notify";
 import { scheduleReminders } from "./lib/reminders";
 import { useFocusEngine } from "./lib/focus";
 import { uid, hashPw } from "./lib/format";
-import { totalPoints } from "./lib/points";
+import { totalPoints, latePenaltyFor } from "./lib/points";
 import { isPrivateTask, isRunning, isActive, elapsedMs, elapsedSecs, pauseWork, resumeWork, clearWork } from "./lib/work";
 import { publicUpdates } from "./lib/updates";
 import { earnedBalance } from "./lib/shop";
@@ -80,7 +82,10 @@ export default function App() {
 
   const [dark, setDark] = useState(() => { try { return localStorage.getItem("crica_theme") === "dark"; } catch (e) { return false; } });
   const [notifOn, setNotifOn] = useState(() => typeof Notification !== "undefined" && Notification.permission === "granted");
-  const [dailyPrompt, setDailyPrompt] = useState(false);
+  const [schedPrompt, setSchedPrompt] = useState(false);
+  const [schedChoice, setSchedChoice] = useState(null); // "later" | "done"
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => { try { return localStorage.getItem("crica_sidebar") === "1"; } catch (e) { return false; } });
+  const toggleSidebar = () => setSidebarCollapsed((v) => { const n = !v; try { localStorage.setItem("crica_sidebar", n ? "1" : "0"); } catch (e) { /* ignore */ } return n; });
   const [tasksBoard, setTasksBoard] = useState(null);
   const [focusOpen, setFocusOpen] = useState(false);
   const notifiedRef = useRef(new Set());
@@ -348,7 +353,8 @@ export default function App() {
         const diff = dateDiff(t.dueDate, todayStr());
         if (diff <= 1) {
           const u = users.find((x) => x.id === aid);
-          out.push({ icon: <Clock size={13} />, text: `${t.title}${u && aid !== me.id ? " (" + u.name + ")" : ""} ${diff < 0 ? "overdue" : diff === 0 ? "due today" : "due tomorrow"}` });
+          const pen = diff < 0 ? latePenaltyFor(t, aid) : 0;
+          out.push({ icon: <Clock size={13} />, text: `${t.title}${u && aid !== me.id ? " (" + u.name + ")" : ""} ${diff < 0 ? (pen > 0 ? `overdue, -${pen} pts` : "overdue") : diff === 0 ? "due today" : "due tomorrow"}` });
         }
       });
     });
@@ -362,19 +368,27 @@ export default function App() {
 
   const openCount = useMemo(() => tasks.filter((t) => t.pool).length, [tasks]);
 
-  // Once a day, after login, prompt to review yesterday's report
+  // Every Sunday, after login, insist on updating next week's work schedule.
+  // "Done" (or Take me there) silences it for the week; "later" only for this
+  // browser session, so it comes back next time the app opens that Sunday.
   useEffect(() => {
     if (!currentUserId) return;
+    if (new Date().getDay() !== 0) return; // Sundays only
     try {
-      const last = localStorage.getItem("crica_dailyseen_" + currentUserId);
-      if (last !== todayStr()) { setDailyPrompt(true); notify("Crica", "New day. Take a look at yesterday's results."); }
+      const wk = startOfWeek(todayStr());
+      if (localStorage.getItem("crica_schedweek_" + currentUserId) === wk) return;
+      if (sessionStorage.getItem("crica_schedlater_" + currentUserId) === todayStr()) return;
+      setSchedChoice(null); setSchedPrompt(true);
     } catch (e) { /* ignore */ }
   }, [currentUserId]);
 
-  const dismissDaily = (goReport) => {
-    try { localStorage.setItem("crica_dailyseen_" + currentUserId, todayStr()); } catch (e) { /* ignore */ }
-    setDailyPrompt(false);
-    if (goReport) { setShowSettings(false); setTab("report"); }
+  const closeSchedPrompt = (goThere) => {
+    try {
+      if (goThere || schedChoice === "done") localStorage.setItem("crica_schedweek_" + currentUserId, startOfWeek(todayStr()));
+      else sessionStorage.setItem("crica_schedlater_" + currentUserId, todayStr());
+    } catch (e) { /* ignore */ }
+    setSchedPrompt(false);
+    if (goThere) { setShowSettings(false); setTab("report"); }
   };
 
   // Fire desktop notifications for newly surfaced alerts (once per text per session)
@@ -427,25 +441,26 @@ export default function App() {
     <>
       <GlobalStyle />
       <div className="app-root">
-        <div className="topbar">
-          <header className="app-header">
-            <button className="header-brand" onClick={goHome} aria-label="Go to home"><WideLogo height={48} /></button>
-            <nav className="top-nav">
-              {TABS.map((tb) => (
-                <button key={tb.id} className={"top-nav-item " + (!showSettings && tab === tb.id ? "on" : "")} onClick={() => { setTab(tb.id); setShowSettings(false); }}>
-                  <span className="nav-ic-wrap"><tb.icon size={16} />{tb.id === "tasks" && unreadUpdates > 0 && <span className="nav-badge">{unreadUpdates}</span>}</span> {tb.label}
-                </button>
-              ))}
-            </nav>
-            <button className="header-me" onClick={() => setShowSettings(true)}>
-              <span className="coin-pill" title="Points you can spend in the shop"><Coins size={13} /> {myBalance.toLocaleString()}</span>
-              <Avatar user={me} size={30} />
-            </button>
-          </header>
-          <AlertBar alerts={alerts} openCount={openCount} onOpen={() => { setTasksBoard("pool"); setShowSettings(false); setTab("tasks"); }} meetings={meetings} users={users} me={me} onRespondMeeting={respondMeeting} onDismissMeeting={dismissMeeting} />
-        </div>
+        <Sidebar tabs={TABS} tab={tab} showSettings={showSettings} me={me} other={users.find((u) => u.id !== currentUserId && !u.hidden)}
+          balance={myBalance} unreadUpdates={unreadUpdates} tasks={tasks} work={work}
+          collapsed={sidebarCollapsed} onToggle={toggleSidebar}
+          onTab={(id) => { setTab(id); setShowSettings(false); }} onSettings={() => setShowSettings(true)} />
 
-        <main className="app-main">{renderTab()}</main>
+        <div className="app-body">
+          <div className="topbar">
+            <header className="app-header">
+              <button className="header-brand" onClick={goHome} aria-label="Go to home"><WideLogo height={48} /></button>
+              <button className="header-me" onClick={() => setShowSettings(true)}>
+                <span className="coin-pill" title="Points you can spend in the shop"><Coins size={13} /> {myBalance.toLocaleString()}</span>
+                <Avatar user={me} size={30} />
+              </button>
+            </header>
+            <AlertBar alerts={alerts} openCount={openCount} onOpen={() => { setTasksBoard("pool"); setShowSettings(false); setTab("tasks"); }} meetings={meetings} users={users} me={me} onRespondMeeting={respondMeeting} onDismissMeeting={dismissMeeting} />
+            <WeekGoal me={me} tasks={tasks} work={work} slim onSetGoal={() => setShowSettings(true)} />
+          </div>
+
+          <main className="app-main">{renderTab()}</main>
+        </div>
 
         <nav className="bottom-nav">
           {TABS.filter((tb) => !MORE_IDS.includes(tb.id)).map((tb) => (
@@ -492,13 +507,23 @@ export default function App() {
           onPauseWork={pauseMyWork} onResumeWork={resumeMyWork} onStopWork={promptStopWork}
         />, pip.pipWindow.document.body)}
 
-      <Modal open={dailyPrompt} onClose={() => dismissDaily(false)} title={`Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 18 ? "afternoon" : "evening"}, ${me?.name || ""}`}>
+      <Modal open={schedPrompt} locked title="New week ahead">
         <p style={{ margin: "0 0 16px", color: "var(--ink-2)", fontSize: 15, lineHeight: 1.5 }}>
-          A fresh day on the board. Take a quick look at how yesterday went before you dive in.
+          It's Sunday, {me?.name || ""}. Set your work schedule for the coming week so the availability view stays true and meetings land where you're actually free.
         </p>
+        <Btn variant="primary" className="full" onClick={() => closeSchedPrompt(true)}><CalendarDays size={16} /> Take me there</Btn>
+        <div className="sched-prompt-checks">
+          <label className={"sched-check " + (schedChoice === "later" ? "on" : "")}>
+            <input type="checkbox" checked={schedChoice === "later"} onChange={() => setSchedChoice(schedChoice === "later" ? null : "later")} />
+            I'll do it later
+          </label>
+          <label className={"sched-check " + (schedChoice === "done" ? "on" : "")}>
+            <input type="checkbox" checked={schedChoice === "done"} onChange={() => setSchedChoice(schedChoice === "done" ? null : "done")} />
+            I've already updated it
+          </label>
+        </div>
         <div className="modal-actions">
-          <Btn variant="ghost" onClick={() => dismissDaily(false)}>Later</Btn>
-          <Btn variant="primary" onClick={() => dismissDaily(true)}><CalendarDays size={16} /> Open report</Btn>
+          <Btn variant="ghost" disabled={!schedChoice} onClick={() => closeSchedPrompt(false)}>{schedChoice ? "Close" : "Tick one to close"}</Btn>
         </div>
       </Modal>
 
