@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { Timer, Lock, SlidersHorizontal, RotateCcw } from "lucide-react";
-import { Modal, Field, Btn } from "./ui";
+import { Modal, Field, Btn, NumStep } from "./ui";
 import { elapsedSecs, isPrivateTask, fmtHm } from "../lib/work";
 
 const QUICK_CUTS = [5, 15, 30, 60]; // minutes to shave off, in one tap
@@ -54,10 +54,8 @@ export function StopModal({ open, task, me, onClose, onPost, onSkip }) {
             {adjusting && (
               <div className="stop-adjust">
                 <div className="stop-hm">
-                  <label><input type="number" min="0" max={Math.floor(measured / 3600)} value={h}
-                    onChange={(e) => setHm(parseInt(e.target.value) || 0, m)} /><span>h</span></label>
-                  <label><input type="number" min="0" max="59" value={m}
-                    onChange={(e) => setHm(h, parseInt(e.target.value) || 0)} /><span>m</span></label>
+                  <NumStep value={h} min={0} max={Math.floor(measured / 3600)} suffix="h" onChange={(v) => setHm(v === "" ? 0 : v, m)} />
+                  <NumStep value={m} min={0} max={59} step={5} suffix="m" onChange={(v) => setHm(h, v === "" ? 0 : v)} />
                   {trimmed > 0 && (
                     <button type="button" className="stop-reset" onClick={() => setSecs(measured)} title="Back to tracked time">
                       <RotateCcw size={13} /> Reset

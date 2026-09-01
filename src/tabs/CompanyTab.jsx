@@ -1,35 +1,38 @@
-import { useState, useEffect } from "react";
-import { Plus, Minus, Pencil, Trash2, Building2, PiggyBank, Receipt, ArrowUp, ArrowDown } from "lucide-react";
-import { Card, Btn, Modal, Field, PageHead } from "../components/ui";
+import { useState, useEffect, useMemo } from "react";
+import { Plus, Minus, Pencil, Trash2, Building2, PiggyBank, Receipt, ArrowUp, ArrowDown, Trophy } from "lucide-react";
+import { Card, Btn, Modal, Field, PageHead, NumStep } from "../components/ui";
 import { useCountUp } from "../lib/hooks";
 import { todayStr, dateDiff, prettyDate } from "../lib/dates";
 import { nextInvoiceDate } from "../lib/invoices";
 import { uid, fmtMoney } from "../lib/format";
 import { fireConfetti } from "../lib/confetti";
-import { BLUE, BLUE_SOFT } from "../lib/constants";
+import { BLUE, tooltipStyle } from "../lib/constants";
+import { AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from "recharts";
 
-function VaultJar({ pct }) {
-  const fillH = Math.max(0, Math.min(1, pct)) * 150;
+// Progress to the company goal, drawn as a half-circle sweep. One measure, one
+// hue: the unfilled track is a light step of the same blue as the fill, so the
+// whole arc reads as a single scale rather than two colours meeting.
+function VaultGauge({ pct, hit }) {
+  const R = 86, CX = 100, CY = 100;
+  const LEN = Math.PI * R;
+  const p = Math.max(0, Math.min(1, pct || 0));
+  const arc = `M ${CX - R} ${CY} A ${R} ${R} 0 0 1 ${CX + R} ${CY}`;
   return (
-    <div className="jar-wrap">
-      <svg viewBox="0 0 200 220" className="jar-svg">
-        <defs>
-          <clipPath id="jarClip"><path d="M40 40 Q40 30 50 30 L150 30 Q160 30 160 40 L156 190 Q156 200 146 200 L54 200 Q44 200 44 190 Z" /></clipPath>
-          <linearGradient id="liquid" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={BLUE_SOFT} /><stop offset="100%" stopColor={BLUE} />
-          </linearGradient>
-        </defs>
-        <g clipPath="url(#jarClip)">
-          <rect x="30" y="30" width="140" height="180" fill="#f0f3f8" />
-          <g style={{ transform: `translateY(${190 - fillH}px)`, transition: "transform 1s cubic-bezier(.2,.8,.2,1)" }}>
-            <path className="wave" d="M20 12 Q50 0 80 12 T140 12 T200 12 V120 H20 Z" fill="url(#liquid)" transform="translate(0,-6)" />
-            <rect x="20" y="12" width="180" height="200" fill="url(#liquid)" />
-          </g>
-        </g>
-        <path d="M40 40 Q40 30 50 30 L150 30 Q160 30 160 40 L156 190 Q156 200 146 200 L54 200 Q44 200 44 190 Z" fill="none" stroke="#1d1d1f" strokeWidth="3.5" />
-        <rect x="62" y="20" width="76" height="14" rx="6" fill="#1d1d1f" />
-      </svg>
-    </div>
+    <svg viewBox="0 0 200 110" className="vault-gauge" role="img"
+      aria-label={`${Math.round(p * 100)} percent of the company goal reached`}>
+      <path className="vault-gauge-track" d={arc} />
+      <path className={"vault-gauge-fill" + (hit ? " hit" : "")} d={arc}
+        strokeDasharray={LEN} strokeDashoffset={LEN * (1 - p)} />
+      {/* Quarter marks, notched out of the arc so they stay recessive. */}
+      {[0.25, 0.5, 0.75].map((t) => {
+        const a = Math.PI * (1 - t);
+        return (
+          <line key={t} className="vault-gauge-tick"
+            x1={CX + Math.cos(a) * (R - 9)} y1={CY - Math.sin(a) * (R - 9)}
+            x2={CX + Math.cos(a) * (R + 9)} y2={CY - Math.sin(a) * (R + 9)} />
+        );
+      })}
+    </svg>
   );
 }
 
@@ -45,6 +48,26 @@ export function CompanyTab({ finance, setFinance, clients, setClients }) {
   const transactions = finance.transactions || [];
   const pct = vault.target > 0 ? vault.current / vault.target : 0;
   const displayVault = Math.round(useCountUp(vault.current));
+
+  // The vault balance after each day that had money movement. Walked forward from
+  // the balance implied by today's total minus every recorded transaction, so the
+  // line always ends exactly on the current balance.
+  const history = useMemo(() => {
+    const txs = (transactions || []).filter((t) => t && t.date && typeof t.amount === "number")
+      .slice().sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+    if (txs.length < 2) return [];
+    const net = txs.reduce((sum, t) => sum + (t.type === "in" ? t.amount : -t.amount), 0);
+    let bal = vault.current - net;
+    const byDay = new Map();
+    txs.forEach((t) => { bal += t.type === "in" ? t.amount : -t.amount; byDay.set(t.date, Math.round(bal)); });
+    return [...byDay.entries()].map(([date, value]) => ({ date, label: prettyDate(date), value })).slice(-40);
+  }, [transactions, vault.current]);
+
+  const monthDelta = useMemo(() => {
+    const m = todayStr().slice(0, 7);
+    return (transactions || []).filter((t) => (t.date || "").slice(0, 7) === m)
+      .reduce((sum, t) => sum + (t.type === "in" ? t.amount : -t.amount), 0);
+  }, [transactions]);
 
   // Monthly income is computed automatically from the active clients
   const activeClients = clients.filter((c) => c.active);
@@ -94,11 +117,52 @@ export function CompanyTab({ finance, setFinance, clients, setClients }) {
               Goal {fmtMoney(vault.target)} <Pencil size={12} />
             </button>
           </div>
-          <div className="vault-amount">{fmtMoney(displayVault)}</div>
         </div>
-        <VaultJar pct={pct} />
-        <div className="vault-pct-bar"><div className="vault-pct-fill" style={{ width: `${Math.min(100, pct * 100)}%` }} /></div>
-        <div className="vault-pct-label">{Math.round(pct * 100)}% of {fmtMoney(vault.target)}</div>
+        <div className="vault-gauge-wrap">
+          <VaultGauge pct={pct} hit={pct >= 1} />
+          <div className="vault-gauge-center">
+            <div className="vault-amount">{fmtMoney(displayVault)}</div>
+            <div className="vault-of">{Math.round(pct * 100)}% of {fmtMoney(vault.target)}</div>
+          </div>
+        </div>
+        <div className={"vault-remain" + (pct >= 1 ? " hit" : "")}>
+          {pct >= 1
+            ? <><Trophy size={14} /> Goal reached</>
+            : <>{fmtMoney(Math.max(0, vault.target - vault.current))} still to go</>}
+        </div>
+
+        {history.length > 1 && (
+          <div className="vault-trend">
+            <div className="vault-trend-head">
+              <span>Balance over time</span>
+              {monthDelta !== 0 && (
+                <span className={"vault-delta " + (monthDelta > 0 ? "up" : "down")}>
+                  {monthDelta > 0 ? <ArrowUp size={12} /> : <ArrowDown size={12} />}
+                  {fmtMoney(Math.abs(monthDelta))} this month
+                </span>
+              )}
+            </div>
+            <div style={{ width: "100%", height: 128 }}>
+              <ResponsiveContainer>
+                <AreaChart data={history} margin={{ top: 8, right: 6, bottom: 0, left: 6 }}>
+                  <defs>
+                    <linearGradient id="vaultFill" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={BLUE} stopOpacity={0.3} />
+                      <stop offset="100%" stopColor={BLUE} stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid vertical={false} stroke="rgba(0,0,0,0.05)" />
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#86868b" }} axisLine={false} tickLine={false} minTickGap={30} />
+                  <YAxis hide domain={["dataMin", "dataMax"]} />
+                  <Tooltip contentStyle={tooltipStyle} cursor={{ stroke: "rgba(0,113,227,0.35)", strokeWidth: 1.5 }}
+                    formatter={(v) => [fmtMoney(v), "Vault"]} />
+                  <Area type="monotone" dataKey="value" stroke={BLUE} strokeWidth={2}
+                    fill="url(#vaultFill)" dot={false} activeDot={{ r: 4.5, strokeWidth: 2 }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        )}
         <div className="vault-actions">
           <Btn variant="soft" onClick={() => setMoneyModal("in")}><Plus size={16} /> Add money</Btn>
           <Btn variant="ghost" onClick={() => setMoneyModal("out")}><Minus size={16} /> Remove</Btn>
@@ -193,7 +257,7 @@ function ClientModal({ open, client, onClose, onSave, onDelete }) {
       <Field label="Client name"><input value={name} onChange={(e) => setName(e.target.value)} autoFocus placeholder="e.g. Northwind Co" /></Field>
       <div className="grid-2">
         <Field label="Monthly pay"><input type="number" inputMode="decimal" value={monthlyAmount} onChange={(e) => setMonthlyAmount(e.target.value)} placeholder="0" /></Field>
-        <Field label="Invoice day"><input type="number" min="1" max="28" value={invoiceDay} onChange={(e) => setInvoiceDay(e.target.value)} /></Field>
+        <Field label="Invoice day"><NumStep value={invoiceDay} min={1} max={28} width={62} suffix="of the month" onChange={setInvoiceDay} /></Field>
       </div>
       <label className="toggle-row"><span>Active client</span>
         <button className={"toggle " + (active ? "toggle-on" : "")} onClick={() => setActive(!active)}><span className="toggle-knob" /></button>

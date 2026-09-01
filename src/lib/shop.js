@@ -37,4 +37,6 @@ export function decoFile(user) {
   return it ? it.file : null;
 }
 export { decoSrc };
-export const earnedBalance = (earned, user) => Math.max(0, (earned || 0) - ((user && user.spent) || 0));
+// Spendable balance: earned points, plus collected weekly-goal rewards (bonus),
+// minus what was spent in the shop.
+export const earnedBalance = (earned, user) => Math.max(0, (earned || 0) + ((user && user.bonus) || 0) - ((user && user.spent) || 0));

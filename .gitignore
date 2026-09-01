@@ -3,3 +3,7 @@ dist
 .DS_Store
 *.local
 .vite
+
+# scratch folders, not part of the app
+_to_delete/
+_backup_*/

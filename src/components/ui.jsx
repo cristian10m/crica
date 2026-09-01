@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { X, Crown } from "lucide-react";
+import { X, Crown, Minus, Plus } from "lucide-react";
 import { BLUE } from "../lib/constants";
 
 export function Card({ children, className = "", style, ...rest }) {
@@ -68,6 +68,23 @@ export function Modal({ open, onClose, title, children, wide, onSubmit, locked }
     </div>
   );
 }
+// Custom number stepper. The native spin arrows are hidden globally (they never
+// matched the theme); this draws its own minus/plus that do.
+export function NumStep({ value, onChange, min = 0, max = 999, step = 1, width = 56, suffix }) {
+  const num = Number(value) || 0;
+  const clamp = (n) => Math.max(min, Math.min(max, n));
+  return (
+    <span className="numstep">
+      <button type="button" className="numstep-btn" disabled={num <= min} onClick={() => onChange(clamp(num - step))} aria-label="Decrease"><Minus size={13} /></button>
+      <input type="number" value={value} min={min} max={max} style={{ width }}
+        onChange={(e) => onChange(e.target.value === "" ? "" : clamp(parseInt(e.target.value, 10) || 0))}
+        onBlur={(e) => { if (e.target.value === "") onChange(min); }} />
+      <button type="button" className="numstep-btn" disabled={num >= max} onClick={() => onChange(clamp(num + step))} aria-label="Increase"><Plus size={13} /></button>
+      {suffix && <span className="numstep-suffix">{suffix}</span>}
+    </span>
+  );
+}
+
 export function Field({ label, children }) {
   return <label className="field"><span className="field-label">{label}</span>{children}</label>;
 }

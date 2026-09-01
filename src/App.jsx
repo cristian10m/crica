@@ -10,7 +10,7 @@ import { FocusFab, FocusOverlay } from "./components/Focus";
 import { usePipWindow, PipMini } from "./components/PipMini";
 import { StopModal } from "./components/StopModal";
 import { Sidebar } from "./components/Sidebar";
-import { WeekGoal } from "./components/WeekGoal";
+import { WeekGoal, GOAL_REWARD } from "./components/WeekGoal";
 import { createPortal } from "react-dom";
 import { LoginScreen } from "./screens/LoginScreen";
 import { DbErrorScreen } from "./screens/DbErrorScreen";
@@ -354,13 +354,13 @@ export default function App() {
         if (diff <= 1) {
           const u = users.find((x) => x.id === aid);
           const pen = diff < 0 ? latePenaltyFor(t, aid) : 0;
-          out.push({ icon: <Clock size={13} />, text: `${t.title}${u && aid !== me.id ? " (" + u.name + ")" : ""} ${diff < 0 ? (pen > 0 ? `overdue, -${pen} pts` : "overdue") : diff === 0 ? "due today" : "due tomorrow"}` });
+          out.push({ icon: <Clock size={13} />, kind: diff < 0 ? "overdue" : "due", text: `${t.title}${u && aid !== me.id ? " (" + u.name + ")" : ""} ${diff < 0 ? (pen > 0 ? `overdue, -${pen} pts` : "overdue") : diff === 0 ? "due today" : "due tomorrow"}` });
         }
       });
     });
     clients.filter((c) => c.active).forEach((c) => {
       const next = nextInvoiceDate(c); const diff = dateDiff(next, todayStr());
-      if (diff <= 2) out.push({ icon: <Receipt size={13} />, text: `Invoice ${c.name} ${diff <= 0 ? "now" : `in ${diff}d`}` });
+      if (diff <= 2) out.push({ icon: <Receipt size={13} />, kind: "invoice", text: `Invoice ${c.name} ${diff <= 0 ? "now" : `in ${diff}d`}` });
     });
     const seen = new Set();
     return out.filter((a) => { if (seen.has(a.text)) return false; seen.add(a.text); return true; }).slice(0, 8);
@@ -381,6 +381,15 @@ export default function App() {
       setSchedChoice(null); setSchedPrompt(true);
     } catch (e) { /* ignore */ }
   }, [currentUserId]);
+
+  // Collect the weekly-goal reward: coins into the spendable balance, and the
+  // claimed weeks recorded so the button only ever pays once per week.
+  const collectGoalReward = (weeks) => {
+    if (!weeks || !weeks.length) return;
+    setUsers(users.map((u) => u.id === currentUserId
+      ? { ...u, bonus: (u.bonus || 0) + GOAL_REWARD * weeks.length, goalClaimed: [...new Set([...(u.goalClaimed || []), ...weeks])] }
+      : u));
+  };
 
   const closeSchedPrompt = (goThere) => {
     try {
@@ -443,7 +452,7 @@ export default function App() {
       <div className="app-root">
         <Sidebar tabs={TABS} tab={tab} showSettings={showSettings} me={me} other={users.find((u) => u.id !== currentUserId && !u.hidden)}
           balance={myBalance} unreadUpdates={unreadUpdates} tasks={tasks} work={work}
-          collapsed={sidebarCollapsed} onToggle={toggleSidebar}
+          collapsed={sidebarCollapsed} onToggle={toggleSidebar} onCollect={collectGoalReward}
           onTab={(id) => { setTab(id); setShowSettings(false); }} onSettings={() => setShowSettings(true)} />
 
         <div className="app-body">
@@ -456,10 +465,10 @@ export default function App() {
               </button>
             </header>
             <AlertBar alerts={alerts} openCount={openCount} onOpen={() => { setTasksBoard("pool"); setShowSettings(false); setTab("tasks"); }} meetings={meetings} users={users} me={me} onRespondMeeting={respondMeeting} onDismissMeeting={dismissMeeting} />
-            <WeekGoal me={me} tasks={tasks} work={work} slim onSetGoal={() => setShowSettings(true)} />
+            <WeekGoal me={me} tasks={tasks} work={work} slim onSetGoal={() => setShowSettings(true)} onCollect={collectGoalReward} />
           </div>
 
-          <main className="app-main">{renderTab()}</main>
+          <main className={"app-main" + (!showSettings && tab === "leads" ? " app-main-wide" : "")}>{renderTab()}</main>
         </div>
 
         <nav className="bottom-nav">

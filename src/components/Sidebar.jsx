@@ -1,9 +1,9 @@
-import { ChevronsLeft, ChevronsRight, Coins } from "lucide-react";
+import { ChevronsLeft, ChevronsRight, Coins, Settings } from "lucide-react";
 import { Avatar, WideLogo, IconMark } from "./ui";
 import { WeekGoal } from "./WeekGoal";
 
 // Desktop navigation: a collapsible rail on the left. Mobile keeps the bottom bar.
-export function Sidebar({ tabs, tab, showSettings, onTab, onSettings, me, other, balance, unreadUpdates, tasks, work, collapsed, onToggle }) {
+export function Sidebar({ tabs, tab, showSettings, onTab, onSettings, me, other, balance, unreadUpdates, tasks, work, collapsed, onToggle, onCollect }) {
   return (
     <aside className={"sidebar" + (collapsed ? " is-collapsed" : "")}>
       <div className="sidebar-head">
@@ -23,14 +23,19 @@ export function Sidebar({ tabs, tab, showSettings, onTab, onSettings, me, other,
         ))}
       </nav>
       <div className="sidebar-foot">
-        <WeekGoal me={me} other={other} tasks={tasks} work={work} onSetGoal={onSettings} compact={collapsed} />
-        <button className={"sidebar-me " + (showSettings ? "on" : "")} onClick={onSettings} title="Profile and settings">
-          <Avatar user={me} size={30} />
-          <span className="sidebar-me-main">
-            <span className="sidebar-me-name">{me.name}</span>
-            <span className="coin-pill" title="Points you can spend in the shop"><Coins size={12} /> {balance.toLocaleString()}</span>
-          </span>
-        </button>
+        <WeekGoal me={me} other={other} tasks={tasks} work={work} onSetGoal={onSettings} onCollect={onCollect} compact={collapsed} />
+        <div className={"sidebar-me-row " + (showSettings ? "on" : "")}>
+          <button className="sidebar-me" onClick={onSettings} title="Profile and settings">
+            <Avatar user={me} size={30} />
+            <span className="sidebar-me-main">
+              <span className="sidebar-me-name">{me.name}</span>
+              <span className="coin-pill" title="Points you can spend in the shop"><Coins size={12} /> {balance.toLocaleString()}</span>
+            </span>
+          </button>
+          <button className={"sidebar-gear " + (showSettings ? "on" : "")} onClick={onSettings} title="Settings" aria-label="Settings">
+            <Settings size={17} />
+          </button>
+        </div>
       </div>
     </aside>
   );

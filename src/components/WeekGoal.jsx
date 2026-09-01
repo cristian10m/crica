@@ -1,17 +1,39 @@
 import { useEffect, useState } from "react";
-import { Target, Check } from "lucide-react";
+import { Target, Check, Coins } from "lucide-react";
 import { startOfWeek, todayStr, addDays } from "../lib/dates";
 import { isRunning, elapsedMs } from "../lib/work";
 import { fireConfetti } from "../lib/confetti";
 
-// Hours worked this week: banked work-log time plus whatever an open (running or
-// paused) session on a task has accumulated but not logged yet.
-export function weekWorkedMs(userId, tasks, work) {
-  const from = startOfWeek(todayStr()), to = addDays(from, 6);
+export const GOAL_REWARD = 50; // spendable coins for hitting the weekly goal
+const REWARD_START = "2026-08-31"; // weeks before the feature existed pay nothing
+
+// Hours worked in a given week: banked work-log time, plus (for the current
+// week only) whatever an open session on a task has accumulated but not logged.
+export function weekWorkedMs(userId, tasks, work, weekStart) {
+  const from = weekStart || startOfWeek(todayStr());
+  const to = addDays(from, 6);
   let ms = 0;
   (work || []).forEach((w) => { if (w.userId === userId && w.date >= from && w.date <= to) ms += (w.seconds || 0) * 1000; });
-  (tasks || []).forEach((t) => { ms += elapsedMs(t, userId); });
+  if (from === startOfWeek(todayStr())) (tasks || []).forEach((t) => { ms += elapsedMs(t, userId); });
   return ms;
+}
+
+// Weeks whose goal was hit but whose reward has not been collected yet. The
+// current week is checked alongside the past few, so an uncollected reward
+// simply waits: the new week's bar starts from zero and counts on regardless.
+export function pendingRewardWeeks(user, tasks, work) {
+  const goal = user.weekGoalHours || 0;
+  if (!goal) return [];
+  const claimed = user.goalClaimed || [];
+  const cur = startOfWeek(todayStr());
+  const out = [];
+  for (let i = 0; i < 5; i++) {
+    const ws = addDays(cur, -7 * i);
+    if (ws < REWARD_START) break;
+    if (claimed.includes(ws)) continue;
+    if (weekWorkedMs(user.id, tasks, work, ws) >= goal * 3600000) out.push(ws);
+  }
+  return out;
 }
 
 const fmtH = (ms) => {
@@ -22,10 +44,26 @@ const fmtH = (ms) => {
   return `${whole}h ${m}m`;
 };
 
-// The weekly hours goal bar. Variants: default (sidebar card), compact (collapsed
-// sidebar), slim (one-line strip under the mobile header). Click always opens
-// settings, where the goal is set.
-export function WeekGoal({ me, other, tasks, work, onSetGoal, compact, slim }) {
+function CollectBtn({ pending, onCollect, mini }) {
+  if (!pending.length || !onCollect) return null;
+  const amount = GOAL_REWARD * pending.length;
+  return (
+    <span
+      role="button" tabIndex={0}
+      className={"goal-collect" + (mini ? " mini" : "")}
+      title={`Weekly goal hit. Collect ${amount} coins.`}
+      onClick={(e) => { e.stopPropagation(); const r = e.currentTarget.getBoundingClientRect(); fireConfetti(r.left + r.width / 2, r.top); onCollect(pending); }}
+      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); e.stopPropagation(); onCollect(pending); } }}
+    >
+      <Coins size={mini ? 11 : 13} /> {amount}
+    </span>
+  );
+}
+
+// The weekly hours goal bar. Variants: default (sidebar card), compact
+// (collapsed sidebar), slim (one-line strip under the mobile header).
+// Clicking the bar opens settings, where the goal is set.
+export function WeekGoal({ me, other, tasks, work, onSetGoal, onCollect, compact, slim }) {
   // Refresh every 30s while my timer runs so the bar creeps forward live.
   const [, setTick] = useState(0);
   const running = (tasks || []).some((t) => isRunning(t, me.id));
@@ -39,6 +77,7 @@ export function WeekGoal({ me, other, tasks, work, onSetGoal, compact, slim }) {
   const mine = weekWorkedMs(me.id, tasks, work);
   const pct = goal > 0 ? Math.min(1, mine / (goal * 3600000)) : 0;
   const hit = goal > 0 && pct >= 1;
+  const pending = pendingRewardWeeks(me, tasks, work);
 
   // One small celebration per person per week, the first time the bar fills.
   useEffect(() => {
@@ -50,28 +89,29 @@ export function WeekGoal({ me, other, tasks, work, onSetGoal, compact, slim }) {
   if (slim) {
     if (!goal) return null;
     return (
-      <button type="button" className={"weekgoal-slim" + (hit ? " hit" : "")} onClick={onSetGoal} title="Weekly hours goal">
+      <div role="button" tabIndex={0} className={"weekgoal-slim" + (hit ? " hit" : "")} onClick={onSetGoal} title="Weekly hours goal">
         {hit ? <Check size={13} /> : <Target size={13} />}
         <span className="weekgoal-track slim"><span className="weekgoal-fill" style={{ width: (pct * 100).toFixed(1) + "%" }} /></span>
+        <CollectBtn pending={pending} onCollect={onCollect} mini />
         <span className="weekgoal-slim-val">{fmtH(mine)} <i>/ {goal}h</i></span>
-      </button>
+      </div>
     );
   }
 
   if (!goal) {
     return (
-      <button type="button" className={"weekgoal empty" + (compact ? " compact" : "")} onClick={onSetGoal} title="Set a weekly hours goal">
+      <div role="button" tabIndex={0} className={"weekgoal empty" + (compact ? " compact" : "")} onClick={onSetGoal} title="Set a weekly hours goal">
         <Target size={15} />{!compact && <span>Set a weekly goal</span>}
-      </button>
+      </div>
     );
   }
 
   if (compact) {
     return (
-      <button type="button" className={"weekgoal compact" + (hit ? " hit" : "")} onClick={onSetGoal} title={`${fmtH(mine)} of ${goal}h this week`}>
+      <div role="button" tabIndex={0} className={"weekgoal compact" + (hit ? " hit" : "")} onClick={onSetGoal} title={`${fmtH(mine)} of ${goal}h this week`}>
         <span className="weekgoal-track mini"><span className="weekgoal-fill" style={{ width: (pct * 100).toFixed(1) + "%" }} /></span>
-        <span className="weekgoal-pct">{Math.round(pct * 100)}%</span>
-      </button>
+        {pending.length ? <CollectBtn pending={pending} onCollect={onCollect} mini /> : <span className="weekgoal-pct">{Math.round(pct * 100)}%</span>}
+      </div>
     );
   }
 
@@ -80,9 +120,10 @@ export function WeekGoal({ me, other, tasks, work, onSetGoal, compact, slim }) {
   const oPct = oGoal > 0 ? Math.min(1, oMs / (oGoal * 3600000)) : 0;
 
   return (
-    <button type="button" className={"weekgoal" + (hit ? " hit" : "")} onClick={onSetGoal} title="Weekly hours goal. Click to adjust it in settings.">
+    <div role="button" tabIndex={0} className={"weekgoal" + (hit ? " hit" : "")} onClick={onSetGoal} title="Weekly hours goal. Click to adjust it in settings.">
       <span className="weekgoal-head">
         <span className="weekgoal-lab">{hit ? <><Check size={13} /> Goal hit</> : <><Target size={13} /> This week</>}</span>
+        <CollectBtn pending={pending} onCollect={onCollect} />
         <span className="weekgoal-val">{fmtH(mine)} <i>/ {goal}h</i></span>
       </span>
       <span className="weekgoal-track"><span className="weekgoal-fill" style={{ width: (pct * 100).toFixed(1) + "%" }} /></span>
@@ -93,6 +134,6 @@ export function WeekGoal({ me, other, tasks, work, onSetGoal, compact, slim }) {
           <span className="weekgoal-other-val">{fmtH(oMs)}</span>
         </span>
       )}
-    </button>
+    </div>
   );
 }

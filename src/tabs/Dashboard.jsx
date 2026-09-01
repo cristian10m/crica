@@ -10,10 +10,10 @@ import { useCountUp } from "../lib/hooks";
 import { pointsOnDay, pointsInRange, totalPoints, evalHabit, focusSecondsInRange } from "../lib/points";
 import { nameStyle } from "../lib/shop";
 import { weekDates, startOfWeek, todayStr, parseDate, WEEKDAY, addDays, dateDiff, monthKey, prettyDate } from "../lib/dates";
-import { BLUE } from "../lib/constants";
+import { BLUE, tooltipStyle } from "../lib/constants";
 import { fmtMoney } from "../lib/format";
 
-export const tooltipStyle = { background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 12, fontSize: 12, color: "var(--ink)", boxShadow: "var(--shadow)" };
+export { tooltipStyle };
 
 function StatTile({ icon, label, value, accent }) {
   return (

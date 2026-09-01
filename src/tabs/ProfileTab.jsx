@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { Camera, Check, LogOut, Trophy, Flame, CheckSquare, Repeat, Timer, Crown, Swords, TrendingUp, Zap, Trash2, Briefcase, Coins, Lock, Sparkles, Target } from "lucide-react";
-import { Card, Btn, Field, Avatar, PageHead } from "../components/ui";
+import { Card, Btn, Field, Avatar, PageHead, NumStep } from "../components/ui";
 import { hashPw } from "../lib/format";
 import { BLUE } from "../lib/constants";
 import { profileStats } from "../lib/points";
@@ -206,10 +206,8 @@ function GoalPicker({ users, me, setUsers }) {
         ))}
       </div>
       <div className="goal-custom">
-        <input type="number" min="1" max="120" placeholder="Custom" value={custom} onChange={(e) => setCustom(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter" && custom) setGoal(custom); }} />
-        <span>hours per week</span>
-        {custom && <button className="pill pill-on" onClick={() => setGoal(custom)}>Set</button>}
+        <NumStep value={custom === "" ? (cur || 0) : custom} min={0} max={120} width={62} suffix="hours per week" onChange={(v) => setCustom(v)} />
+        {custom !== "" && Number(custom) !== cur && <button className="pill pill-on" onClick={() => setGoal(custom)}>Set</button>}
       </div>
       {cur > 0 && <p className="muted-small" style={{ marginTop: 10 }}>Current goal: {cur} hours a week. It resets every Monday.</p>}
     </div>

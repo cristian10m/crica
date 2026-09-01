@@ -17,6 +17,7 @@ export const ICON_GLYPH = {
   leaf: "\u{1F343}", coffee: "\u2615", money: "\u{1F4B0}", heart: "\u2764\uFE0F",
 };
 
+export const tooltipStyle = { background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 12, fontSize: 12, color: "var(--ink)", boxShadow: "var(--shadow)" };
 export const DEFAULT_FINANCE = { vault: { current: 0, target: 50000 }, monthTarget: 10000, transactions: [] };
 export const DEFAULT_USERS = [
   { id: "cristian", name: "Cristian", color: "#0071E3", pw: hashPw("12345") },

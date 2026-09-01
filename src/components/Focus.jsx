@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Timer, Pause, Play, Square, X, Check, Sparkles } from "lucide-react";
-import { Btn } from "./ui";
+import { Btn, NumStep } from "./ui";
 import { fireConfetti } from "../lib/confetti";
 import { earnedPoints, POINT_INTERVAL_MS, FOCUS_PRESETS, FOCUS_MAX_MIN, POINTS_PER_HOUR } from "../lib/focus";
 
@@ -74,9 +74,8 @@ export function FocusOverlay({ open, onClose, engine, onStart }) {
           </div>
           <div className="focus-custom">
             <span>Custom</span>
-            <input type="number" min="1" max={FOCUS_MAX_MIN} value={custom}
-              onChange={(e) => setCustom(Math.max(1, Math.min(FOCUS_MAX_MIN, parseInt(e.target.value) || 1)))} />
-            <span>min</span>
+            <NumStep value={custom} min={1} max={FOCUS_MAX_MIN} step={5} width={58} suffix="min"
+              onChange={(v) => setCustom(v === "" ? "" : v)} />
             <Btn variant="primary" onClick={() => begin(custom)}><Play size={15} /> Start</Btn>
           </div>
         </div>
