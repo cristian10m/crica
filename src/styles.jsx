@@ -741,13 +741,6 @@ export function GlobalStyle() {
     .meet-no { display: grid; place-items: center; border: none; cursor: pointer; background: var(--line); color: var(--ink-2); padding: 4px; border-radius: 999px; }
     .alert-bar.has-new .meet-no { background: rgba(255,255,255,0.25); color: #fff; }
     .meet-no svg { color: inherit !important; }
-    .sched-meeting { display: flex; align-items: center; gap: 7px; margin-top: 9px; padding: 7px 11px; border-radius: 10px; font-size: 12.5px; font-weight: 500; background: rgba(0,113,227,0.1); color: var(--blue); }
-    .sched-meeting svg { color: inherit; }
-    .sched-meeting.accepted { background: rgba(52,199,89,0.14); color: #2ba84a; }
-    html.crica-dark .sched-meeting.accepted { color: #45d869; }
-    .sched-meeting-status { margin-left: auto; opacity: 0.85; text-transform: lowercase; }
-    .sched-propose { display: inline-flex; align-items: center; gap: 6px; margin-top: 9px; border: 1px dashed var(--line); background: transparent; color: var(--ink-3); font-size: 12.5px; font-weight: 500; padding: 6px 11px; border-radius: 10px; cursor: pointer; transition: all .15s; }
-    .sched-propose:hover { color: var(--blue); border-color: var(--blue); }
     
 
     /* Dashboard */
@@ -793,48 +786,122 @@ export function GlobalStyle() {
     .profile-h2h svg { color: var(--blue); }
     .settings-divider { margin: 22px 2px 12px; font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); }
 
-    /* Schedule / availability */
-    .sched-intro { display: flex; align-items: flex-start; gap: 7px; font-size: 13px; color: var(--ink-2); line-height: 1.45; margin: 4px 2px 14px; }
-    .sched-intro svg { color: #34C759; flex-shrink: 0; margin-top: 2px; }
-    .sched-week-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-    .sched-week-label { font-weight: 700; font-size: 15px; letter-spacing: -0.01em; }
-    .sched-axis { display: flex; gap: 8px; margin-bottom: 4px; }
-    .sched-axis-spacer { width: 22px; flex: none; }
-    .sched-axis-track { position: relative; flex: 1; height: 14px; }
-    .sched-axis-track span { position: absolute; top: 0; font-size: 10px; color: var(--ink-3); transform: translateX(-50%); white-space: nowrap; }
-    .sched-axis-track span:first-child { transform: none; }
-    .sched-axis-track span:last-child { transform: translateX(-100%); }
-    .sched-day { padding: 11px 13px; margin-bottom: 8px; }
-    .sched-today { border-color: var(--blue); }
-    .sched-day-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 9px; }
-    .sched-day-name { font-weight: 700; font-size: 13.5px; flex-shrink: 0; }
-    .sched-free-text { font-size: 12.5px; font-weight: 500; text-align: right; line-height: 1.35; }
-    .sched-free-text.has-free { color: #2ba84a; }
-    html.crica-dark .sched-free-text.has-free { color: #45d869; }
-    .sched-free-text.no-free { color: var(--ink-3); font-weight: 500; }
-    .sched-lanes { display: flex; flex-direction: column; gap: 5px; }
-    .sched-lane { display: flex; align-items: center; gap: 8px; }
-    .sched-lane-name { width: 22px; flex: none; display: grid; place-items: center; color: var(--ink-3); }
-    .sched-free-ic { color: #34C759; }
-    .sched-track { position: relative; flex: 1; height: 14px; background: var(--line-2); border-radius: 5px; overflow: hidden; }
-    .sched-busy { position: absolute; top: 0; bottom: 0; border-radius: 4px; opacity: 0.92; }
-    .sched-free-track { background: var(--line-2); }
-    .sched-free { position: absolute; top: 0; bottom: 0; background: #34C759; border-radius: 4px; }
-    .sched-allfree { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 9px; color: var(--ink-3); letter-spacing: 0.02em; }
+    /* Availability. One card for the whole week, one lane per day. The old
+       version stacked seven cards of three bars each, which was 21 tracks down
+       the page and no way to read a time once you had scrolled past the axis. */
+    .avail-card { padding: 15px 16px 12px; }
+    .avail-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+    .avail-title { display: inline-flex; align-items: center; gap: 7px; font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+    .avail-title svg { color: #34C759; }
+    .avail-nav { display: flex; align-items: center; gap: 4px; }
+    .avail-week { font-size: 12.5px; font-weight: 600; color: var(--ink-2); min-width: 112px; text-align: center; font-variant-numeric: tabular-nums; }
+    .avail-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; margin: 10px 0 4px; }
+    .avail-key { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; color: var(--ink-3); }
+    .avail-key i { width: 14px; height: 5px; border-radius: 3px; flex: none; }
+    .avail-key i.free { width: 12px; height: 12px; border-radius: 4px; background: #34C759; }
+    .avail-key-note { margin-left: auto; font-size: 11px; color: var(--ink-3); font-style: italic; }
 
-    .rota-row { display: flex; flex-direction: column; gap: 9px; padding: 11px 0; border-bottom: 1px solid var(--line-2); }
-    .rota-row:last-child { border-bottom: none; padding-bottom: 0; }
-    .rota-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; background: none; border: none; padding: 0; cursor: pointer; }
-    .rota-day { font-weight: 500; font-size: 14.5px; color: var(--ink); }
-    .rota-status { font-size: 12px; font-weight: 500; color: var(--blue); padding: 3px 10px; border-radius: 999px; background: rgba(0,113,227,0.1); }
-    .rota-status.off { color: var(--ink-3); background: var(--line-2); }
+    .avail-axis { display: flex; align-items: center; gap: 10px; height: 15px; margin-bottom: 2px; }
+    .avail-axis-track { position: relative; flex: 1; height: 100%; }
+    .avail-axis-track span { position: absolute; top: 0; font-size: 10px; font-weight: 600; color: var(--ink-3); transform: translateX(-50%); white-space: nowrap; }
+    .avail-axis-track span:first-child { transform: none; }
+    .avail-axis-track span:last-child { transform: translateX(-100%); }
+
+    .avail-day { border-radius: 10px; padding: 2px 4px; margin: 0 -4px; transition: background .15s; }
+    .avail-day.today { background: rgba(0,113,227,0.06); }
+    html.crica-dark .avail-day.today { background: rgba(0,113,227,0.12); }
+    .avail-row { display: flex; align-items: center; gap: 10px; padding: 4px 0; }
+    .avail-rowlab { width: 58px; flex: none; font-size: 11.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+    .avail-rowlab b { font-size: 12.5px; font-weight: 700; color: var(--ink-2); }
+    .avail-day.today .avail-rowlab b { color: var(--blue); }
+
+    .avail-track { position: relative; flex: 1; min-width: 0; height: 28px; border-radius: 8px; background: var(--line-2); overflow: hidden; }
+    .avail-gridline { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--line); }
+    .avail-free { position: absolute; top: 0; bottom: 0; background: #34C759; border-radius: 6px; }
+    /* Thin bands hugging opposite edges, so the two people never sit on the
+       same pixels and the block below stays readable underneath. */
+    .avail-busy { position: absolute; height: 5px; border-radius: 3px; opacity: 0.95; }
+    .avail-busy.lane0 { top: 3px; }
+    .avail-busy.lane1 { bottom: 3px; }
+    .avail-meet { position: absolute; top: 0; bottom: 0; border-radius: 6px; border: 2px solid var(--blue); background: rgba(0,113,227,0.16); }
+    .avail-meet.accepted { border-color: #34C759; background: rgba(52,199,89,0.2); }
+
+    .avail-when { width: 138px; flex: none; text-align: right; font-size: 11.5px; font-weight: 600; color: #2ba84a; line-height: 1.3; }
+    html.crica-dark .avail-when { color: #45d869; }
+    .avail-when.none { color: var(--ink-3); font-weight: 500; }
+    .avail-add { width: 28px; height: 28px; flex: none; border: 1px solid var(--line); border-radius: 9px; background: var(--surface); color: var(--ink-3);
+      display: grid; place-items: center; cursor: pointer; transition: color .15s, border-color .15s, background .15s; }
+    .avail-add:hover { color: var(--blue); border-color: var(--blue); background: rgba(0,113,227,0.07); }
+    .avail-add-gap { width: 28px; flex: none; }
+
+    .avail-meets { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 0 6px 68px; }
+    .avail-meet-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 600;
+      padding: 3px 9px; border-radius: 999px; background: rgba(0,113,227,0.1); color: var(--blue); }
+    .avail-meet-chip.accepted { background: rgba(52,199,89,0.14); color: #2ba84a; }
+    html.crica-dark .avail-meet-chip.accepted { color: #45d869; }
+    .avail-meet-chip svg { color: inherit; }
+    .avail-meet-chip i { font-style: normal; font-weight: 500; opacity: 0.75; }
+
+    @media (max-width: 700px) {
+      .avail-row { flex-wrap: wrap; }
+      /* Keep the propose button up on the bar's own line; only the free-time
+         text drops underneath, otherwise it lands on a third line of its own. */
+      .avail-add, .avail-add-gap { order: 2; }
+      .avail-when { order: 3; width: auto; flex: 1 0 100%; text-align: left; padding-left: 68px; margin-top: 1px; }
+      .avail-key-note { display: none; }
+      .avail-meets { padding-left: 68px; }
+    }
+
+    /* The two schedule editors are separate cards and must read that way. */
+    .sched-setup { display: flex; flex-direction: column; gap: 14px; }
+
+    /* Keep the editor a comfortable form width instead of stretching the
+       toggles into slabs across a wide card. */
+    .rota-picker, .rota-summary, .rota-list { max-width: 480px; }
+    .rota-picker { display: flex; gap: 6px; margin-bottom: 12px; }
+    .rota-pip { flex: 1; height: 42px; min-width: 0; border-radius: 12px; border: 1.5px solid var(--line); background: var(--surface);
+      color: var(--ink-3); font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
+      transition: background .15s, border-color .15s, color .15s, box-shadow .15s, transform .1s; }
+    .rota-pip:hover { border-color: var(--blue); color: var(--ink); }
+    .rota-pip:active { transform: scale(0.94); }
+    .rota-pip.on { background: var(--blue); border-color: var(--blue); color: #fff; box-shadow: 0 2px 8px rgba(0,113,227,0.32); }
+    .rota-summary { display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      font-size: 12.5px; color: var(--ink-3); padding-bottom: 10px; border-bottom: 1px solid var(--line-2); }
+    .rota-total b { color: var(--ink); font-weight: 700; }
+    .rota-link { display: inline-flex; align-items: center; gap: 5px; flex: none; border: none; background: none; color: var(--blue);
+      font-family: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; padding: 0; }
+    .rota-link:hover { text-decoration: underline; }
+    .rota-list { display: flex; flex-direction: column; }
+    .rota-line { display: flex; align-items: center; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--line-2); }
+    .rota-line:last-child { border-bottom: none; padding-bottom: 0; }
+    .rota-line-day { width: 34px; flex: none; font-size: 13px; font-weight: 700; color: var(--ink); }
+    .rota-line input[type=time] { border: 1.5px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 9px;
+      padding: 7px 9px; font-size: 13.5px; font-weight: 600; }
+    .rota-line input[type=time]:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(0,113,227,0.15); }
+    .rota-dash { font-size: 12px; color: var(--ink-3); flex: none; }
+    .rota-line-len { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+    .rota-copy { width: 30px; height: 30px; flex: none; border: none; border-radius: 9px; background: transparent; color: var(--ink-3);
+      display: grid; place-items: center; cursor: pointer; transition: background .15s, color .15s; }
+    .rota-copy:hover { background: var(--line-2); color: var(--blue); }
+    @media (max-width: 470px) {
+      .rota-line-len { display: none; }
+      .rota-line input[type=time] { flex: 1; min-width: 0; }
+    }
+
+    /* Times inside the popups keep the old inline layout. */
     .rota-times { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink-2); }
     .rota-times input { border: 1.5px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 9px; padding: 8px 10px; font-size: 14px; font-weight: 500; }
-    .rota-clone { margin-left: auto; color: var(--blue); }
+
     .exc-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 0; border-bottom: 1px solid var(--line-2); }
     .exc-row:last-of-type { border-bottom: none; }
-    .exc-date { font-weight: 500; font-size: 14px; }
-    .exc-detail { font-size: 12.5px; color: var(--ink-3); margin-top: 2px; }
+    .exc-main { min-width: 0; }
+    .exc-date { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; font-weight: 600; font-size: 14px; }
+    .exc-detail { font-size: 12.5px; color: var(--ink-3); margin-top: 3px; }
+    .exc-tag { font-size: 10.5px; font-weight: 700; letter-spacing: .02em; padding: 2px 7px; border-radius: 999px;
+      background: var(--line-2); color: var(--ink-3); }
+    .exc-tag.now { background: rgba(52,199,89,0.16); color: #2ba84a; }
+    html.crica-dark .exc-tag.now { color: #45d869; }
+    .field-warn { color: #ff3b30 !important; }
 
     /* Habits */
     .habit-card { display: flex; align-items: center; gap: 12px; padding: 13px 14px; transition: box-shadow .2s, transform .2s; }

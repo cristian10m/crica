@@ -22,6 +22,17 @@ export const fmtMin = (min) => {
   return m === 0 ? `${hh}${ap}` : `${hh}:${String(m).padStart(2, "0")}${ap}`;
 };
 
+// A time-off entry covers one day, or a run of days when endDate is set.
+// Dates are ISO strings, so a plain string compare is a date compare.
+export const excEnd = (ex) => (ex && ex.endDate && ex.endDate > ex.date ? ex.endDate : (ex ? ex.date : ""));
+export const excCovers = (ex, dateStr) => !!ex && dateStr >= ex.date && dateStr <= excEnd(ex);
+export const excIsOver = (ex, today) => excEnd(ex) < today;
+export const excDayCount = (ex) => {
+  if (!ex) return 0;
+  const a = parseDate(ex.date), b = parseDate(excEnd(ex));
+  return Math.max(1, Math.round((b - a) / 86400000) + 1);
+};
+
 export const weekdayKey = (dateStr) => { const d = parseDate(dateStr); return DAY_KEYS[(d.getDay() + 6) % 7]; };
 
 function clampMerge(intervals) {
@@ -56,7 +67,7 @@ export function busyFor(schedule, dateStr) {
     if (s != null && e != null) out.push([s, e]);
   }
   (schedule.exceptions || []).forEach((ex) => {
-    if (ex.date !== dateStr) return;
+    if (!excCovers(ex, dateStr)) return; // covers a single day or a whole run
     if (ex.allDay) out.push([WINDOW_START, WINDOW_END]);
     else { const s = toMin(ex.start), e = toMin(ex.end); if (s != null && e != null) out.push([s, e]); }
   });
