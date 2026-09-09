@@ -84,6 +84,7 @@ export default function App() {
   const [notifOn, setNotifOn] = useState(() => typeof Notification !== "undefined" && Notification.permission === "granted");
   const [schedPrompt, setSchedPrompt] = useState(false);
   const [schedChoice, setSchedChoice] = useState(null); // "later" | "done"
+  const schedShownRef = useRef(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => { try { return localStorage.getItem("crica_sidebar") === "1"; } catch (e) { return false; } });
   const toggleSidebar = () => setSidebarCollapsed((v) => { const n = !v; try { localStorage.setItem("crica_sidebar", n ? "1" : "0"); } catch (e) { /* ignore */ } return n; });
   const [tasksBoard, setTasksBoard] = useState(null);
@@ -368,18 +369,37 @@ export default function App() {
 
   const openCount = useMemo(() => tasks.filter((t) => t.pool).length, [tasks]);
 
-  // Every Sunday, after login, insist on updating next week's work schedule.
+  // Every Sunday, insist on updating next week's work schedule.
   // "Done" (or Take me there) silences it for the week; "later" only for this
   // browser session, so it comes back next time the app opens that Sunday.
+  //
+  // This used to run once, at login. Crica is normally left open, so Sunday
+  // arrived with nothing left to check and the prompt never came back after the
+  // week you first signed in. It now re-checks on a timer and whenever the tab
+  // comes back to the front.
   useEffect(() => {
     if (!currentUserId) return;
-    if (new Date().getDay() !== 0) return; // Sundays only
-    try {
-      const wk = startOfWeek(todayStr());
-      if (localStorage.getItem("crica_schedweek_" + currentUserId) === wk) return;
-      if (sessionStorage.getItem("crica_schedlater_" + currentUserId) === todayStr()) return;
-      setSchedChoice(null); setSchedPrompt(true);
-    } catch (e) { /* ignore */ }
+    const check = () => {
+      if (new Date().getDay() !== 0) { schedShownRef.current = false; return; } // Sundays only
+      if (schedShownRef.current) return; // already open, do not wipe the answer they are giving
+      try {
+        const wk = startOfWeek(todayStr());
+        if (localStorage.getItem("crica_schedweek_" + currentUserId) === wk) return;
+        if (sessionStorage.getItem("crica_schedlater_" + currentUserId) === todayStr()) return;
+        schedShownRef.current = true;
+        setSchedChoice(null); setSchedPrompt(true);
+      } catch (e) { /* ignore */ }
+    };
+    check();
+    const id = setInterval(check, 60000);
+    const onWake = () => { if (!document.hidden) check(); };
+    document.addEventListener("visibilitychange", onWake);
+    window.addEventListener("focus", onWake);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onWake);
+      window.removeEventListener("focus", onWake);
+    };
   }, [currentUserId]);
 
   // Collect the weekly-goal reward: coins into the spendable balance, and the
