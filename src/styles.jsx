@@ -801,11 +801,13 @@ export function GlobalStyle() {
     .avail-key i.free { width: 12px; height: 12px; border-radius: 4px; background: #34C759; }
     .avail-key-note { margin-left: auto; font-size: 11px; color: var(--ink-3); font-style: italic; }
 
-    .avail-axis { display: flex; align-items: center; gap: 10px; height: 15px; margin-bottom: 2px; }
-    .avail-axis-track { position: relative; flex: 1; height: 100%; }
-    .avail-axis-track span { position: absolute; top: 0; font-size: 10px; font-weight: 600; color: var(--ink-3); transform: translateX(-50%); white-space: nowrap; }
-    .avail-axis-track span:first-child { transform: none; }
-    .avail-axis-track span:last-child { transform: translateX(-100%); }
+    .avail-axis { display: flex; align-items: center; gap: 10px; height: 16px; margin-bottom: 3px; }
+    .avail-axis-track { position: relative; flex: 1; min-width: 0; height: 100%; }
+    /* Classed rather than nth-child: the now pill is also a child of this track,
+       and positional selectors were handing it the end label's transform. */
+    .avail-axis-lab { position: absolute; top: 0; font-size: 10px; font-weight: 600; color: var(--ink-3); transform: translateX(-50%); white-space: nowrap; }
+    .avail-axis-lab.start { transform: none; }
+    .avail-axis-lab.end { transform: translateX(-100%); }
 
     .avail-day { border-radius: 10px; padding: 2px 4px; margin: 0 -4px; transition: background .15s; }
     .avail-day.today { background: rgba(0,113,227,0.06); }
@@ -815,6 +817,9 @@ export function GlobalStyle() {
     .avail-rowlab b { font-size: 12.5px; font-weight: 700; color: var(--ink-2); }
     .avail-day.today .avail-rowlab b { color: var(--blue); }
 
+    /* The track sits in a wrapper so the now-line can align to it for free and
+       still overhang into the gap between rows, reading as one line down the grid. */
+    .avail-track-wrap { position: relative; flex: 1; min-width: 0; display: flex; }
     .avail-track { position: relative; flex: 1; min-width: 0; height: 28px; border-radius: 8px; background: var(--line-2); overflow: hidden; }
     .avail-gridline { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--line); }
     .avail-free { position: absolute; top: 0; bottom: 0; background: #34C759; border-radius: 6px; }
@@ -825,6 +830,26 @@ export function GlobalStyle() {
     .avail-busy.lane1 { bottom: 3px; }
     .avail-meet { position: absolute; top: 0; bottom: 0; border-radius: 6px; border: 2px solid var(--blue); background: rgba(0,113,227,0.16); }
     .avail-meet.accepted { border-color: #34C759; background: rgba(52,199,89,0.2); }
+
+    /* Now marker. Deliberately ink rather than red or amber: those already mean
+       overdue and attention here, and one of you may pick a red display colour. */
+    .avail-now { position: absolute; top: -6px; bottom: -6px; width: 2px; margin-left: -1px; border-radius: 2px;
+      background: var(--ink); opacity: 0.28; pointer-events: none; z-index: 4; transition: left 1s linear; }
+    .avail-day.today .avail-now { opacity: 1; box-shadow: 0 0 0 3px var(--surface); }
+    .avail-day.today .avail-now::before { content: ""; position: absolute; left: -3px; top: -3px; width: 8px; height: 8px;
+      border-radius: 50%; background: var(--ink); }
+    .avail-now-pill { position: absolute; top: -1px; transform: translateX(-50%); z-index: 5;
+      background: var(--ink); color: var(--surface); font-size: 9.5px; font-weight: 800; letter-spacing: .02em;
+      padding: 2px 6px; border-radius: 999px; white-space: nowrap; transition: left 1s linear; }
+
+    /* Who is busy right this minute, in words. */
+    .avail-nowbar { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; margin: 2px 0 10px;
+      padding: 7px 10px; border-radius: 10px; background: var(--line-2); }
+    .avail-nowbar-time { font-size: 11.5px; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; }
+    .avail-nowbar-who { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; color: #2ba84a; }
+    html.crica-dark .avail-nowbar-who { color: #45d869; }
+    .avail-nowbar-who.busy { color: var(--ink-2); }
+    .avail-nowbar-who i { width: 8px; height: 8px; border-radius: 50%; flex: none; }
 
     .avail-when { width: 138px; flex: none; text-align: right; font-size: 11.5px; font-weight: 600; color: #2ba84a; line-height: 1.3; }
     html.crica-dark .avail-when { color: #45d869; }

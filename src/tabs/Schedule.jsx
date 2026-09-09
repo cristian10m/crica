@@ -5,7 +5,7 @@ import { weekDates, todayStr, addDays, parseDate, prettyDate, MONTHS, tzOffsetMi
 import { uid } from "../lib/format";
 import {
   DAY_KEYS, DAY_LABELS, DAY_SHORT, busyFor, freeTogether, pct, fmtRange, fmtMin, weekdayKey, toMin, shiftIntervals,
-  excEnd, excCovers, excDayCount,
+  excEnd, excCovers, excDayCount, WINDOW_START, WINDOW_END,
 } from "../lib/schedule";
 
 const fmtDur = (mins) => {
@@ -54,6 +54,33 @@ export function Schedule({ users: allUsers, me, schedules, setSchedules, meeting
   // Only what is still ahead of you. Once the last day of a booking has passed it
   // leaves the list on its own, but stays in the data so past weeks still read right.
   const today = todayStr();
+
+  // A marker for the current time, so a shift ending at 4pm means something.
+  // Ticks every half minute; the row only re-reads the clock, nothing refetches.
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(id);
+  }, []);
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  // Only meaningful on the week that actually contains today, and only inside
+  // the 6am to midnight window the grid draws.
+  const nowShown = week.includes(today) && nowMin >= WINDOW_START && nowMin <= WINDOW_END;
+  const nowLeft = pct(nowMin) + "%";
+
+  // Is each person busy at this exact moment, and until when.
+  const nowStatus = (() => {
+    if (!week.includes(today)) return null;
+    const noon = parseDate(today); noon.setHours(12, 0, 0, 0);
+    const viewerTz = me.tz || localTz();
+    const viewerOff = tzOffsetMin(viewerTz, noon);
+    return users.map((u) => {
+      const off = tzOffsetMin(u.tz || viewerTz, noon);
+      const iv = shiftIntervals(busyFor(schedules[u.id], today), viewerOff - off)
+        .find(([st, en]) => nowMin >= st && nowMin < en);
+      return { user: u, until: iv ? iv[1] : null };
+    });
+  })();
   const exceptions = (mySched.exceptions || [])
     .filter((ex) => excEnd(ex) >= today)
     .slice().sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
@@ -88,14 +115,29 @@ export function Schedule({ users: allUsers, me, schedules, setSchedules, meeting
           <span className="avail-key-note">your local time</span>
         </div>
 
+        {nowStatus && (
+          <div className="avail-nowbar">
+            <span className="avail-nowbar-time">Now {fmtMin(nowMin)}</span>
+            {nowStatus.map(({ user: u, until }) => (
+              <span key={u.id} className={"avail-nowbar-who" + (until != null ? " busy" : "")}>
+                <i style={{ background: u.color }} />
+                {u.name} {until != null ? `busy until ${fmtMin(until)}` : "free"}
+              </span>
+            ))}
+          </div>
+        )}
+
         <div className="avail-axis">
           <span className="avail-rowlab" />
           <div className="avail-axis-track">
-            <span style={{ left: "0%" }}>6am</span>
-            <span style={{ left: "33.3%" }}>12pm</span>
-            <span style={{ left: "66.6%" }}>6pm</span>
-            <span style={{ left: "100%" }}>12am</span>
+            <span className="avail-axis-lab start" style={{ left: "0%" }}>6am</span>
+            <span className="avail-axis-lab" style={{ left: "33.3%" }}>12pm</span>
+            <span className="avail-axis-lab" style={{ left: "66.6%" }}>6pm</span>
+            <span className="avail-axis-lab end" style={{ left: "100%" }}>12am</span>
+            {nowShown && <span className="avail-now-pill" style={{ left: nowLeft }}>{fmtMin(nowMin)}</span>}
           </div>
+          <span className="avail-when" />
+          <span className="avail-add-gap" />
         </div>
 
         {week.map((date) => {
@@ -119,6 +161,7 @@ export function Schedule({ users: allUsers, me, schedules, setSchedules, meeting
                 {/* One lane per day. The green block is the answer to the question
                     (when can we both talk); each person's busy time rides the top
                     and bottom edge, so identity is position as well as colour. */}
+                <div className="avail-track-wrap">
                 <div className="avail-track">
                   <span className="avail-gridline" style={{ left: "33.3%" }} />
                   <span className="avail-gridline" style={{ left: "66.6%" }} />
@@ -135,6 +178,8 @@ export function Schedule({ users: allUsers, me, schedules, setSchedules, meeting
                     if (ms == null || me2 == null) return null;
                     return <span key={m.id} className={"avail-meet " + m.status} style={{ left: pct(ms) + "%", width: Math.max(1.2, pct(me2) - pct(ms)) + "%" }} />;
                   })}
+                </div>
+                {nowShown && <span className="avail-now" style={{ left: nowLeft }} />}
                 </div>
                 <span className={"avail-when" + (free.length ? "" : " none")}>
                   {free.length ? free.map(([st, en]) => fmtRange(st, en)).join(", ") : "nothing shared"}
