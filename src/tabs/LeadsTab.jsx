@@ -16,9 +16,22 @@ const DEFAULT_STAGES = [
 ];
 const STAGE_COLORS = ["#0071e3", "#ff9500", "#ffcc00", "#34c759", "#30b0c7", "#5e5ce6", "#af52de", "#ff2d92", "#ff3b30", "#8e8e93"];
 
-const digits = (s) => (s || "").replace(/[^\d+]/g, "");
-const isPhone = (s) => digits(s).replace(/\D/g, "").length >= 7;
-const isEmail = (s) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((s || "").trim());
+// One Contact box can hold a phone, an email, or both at once. The email is
+// lifted out before the phone is read, otherwise the digits inside an address
+// like john99@mail.com get swept into the number and Call and WhatsApp dial it.
+const EMAIL_RE = /[^\s,;:<>()[\]@]+@[^\s,;:<>()[\]@]+\.[A-Za-z][^\s,;:<>()[\]@]*/;
+const EMAIL_RE_G = new RegExp(EMAIL_RE.source, "g");
+
+const emailOf = (s) => {
+  const m = String(s || "").match(EMAIL_RE);
+  return m ? m[0].replace(/[.,;:]+$/, "") : "";
+};
+const phoneOf = (s) => {
+  const rest = String(s || "").replace(EMAIL_RE_G, " "); // email out of the way first
+  const nums = rest.replace(/\D/g, "");
+  if (nums.length < 7) return "";
+  return (/\+\s*\d/.test(rest) ? "+" : "") + nums; // keep a country prefix if one was typed
+};
 const relTime = (ms) => {
   const d = Math.floor((Date.now() - (ms || 0)) / 86400000);
   if (d <= 0) return "today";
@@ -128,7 +141,10 @@ export function LeadsTab({ pipeline, setPipeline, me }) {
               </div>
               <div className="lead-col-body">
                 {colLeads.length === 0 && <div className="lead-empty">Drop leads here</div>}
-                {colLeads.map((l) => (
+                {colLeads.map((l) => {
+                  const phone = phoneOf(l.contact);
+                  const email = emailOf(l.contact);
+                  return (
                   <div
                     key={l.id}
                     className={"lead-card" + (drag && drag.lead.id === l.id ? " ghost" : "")}
@@ -142,14 +158,14 @@ export function LeadsTab({ pipeline, setPipeline, me }) {
                       {l.contact && <div className="lead-contact">{l.contact}</div>}
                       <div className="lead-foot">
                         <span className="lead-age">{relTime(l.createdAt)}</span>
-                        {isPhone(l.contact) && (
-                          <a className="lead-quick wa" href={`https://wa.me/${digits(l.contact).replace(/^\+/, "")}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} title="WhatsApp"><MessageCircle size={14} /></a>
+                        {phone && (
+                          <a className="lead-quick wa" href={`https://wa.me/${phone.replace(/^\+/, "")}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} title={`WhatsApp ${phone}`}><MessageCircle size={14} /></a>
                         )}
-                        {isPhone(l.contact) && (
-                          <a className="lead-quick" href={`tel:${digits(l.contact)}`} onClick={(e) => e.stopPropagation()} title="Call"><Phone size={13} /></a>
+                        {phone && (
+                          <a className="lead-quick" href={`tel:${phone}`} onClick={(e) => e.stopPropagation()} title={`Call ${phone}`}><Phone size={13} /></a>
                         )}
-                        {isEmail(l.contact) && (
-                          <a className="lead-quick" href={`mailto:${l.contact}`} onClick={(e) => e.stopPropagation()} title="Email"><Mail size={13} /></a>
+                        {email && (
+                          <a className="lead-quick" href={`mailto:${email}`} onClick={(e) => e.stopPropagation()} title={`Email ${email}`}><Mail size={13} /></a>
                         )}
                       </div>
                     </div>
@@ -158,7 +174,8 @@ export function LeadsTab({ pipeline, setPipeline, me }) {
                       <button disabled={si === stages.length - 1} onClick={(e) => { e.stopPropagation(); moveLead(l.id, stages[si + 1].id); }} title="Move right"><ChevronRight size={16} /></button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           );
@@ -197,13 +214,15 @@ function LeadModal({ lead, stages, onClose, onSave, onDelete, onMove }) {
   const [note, setNote] = useState(lead.note || "");
   const [stageId, setStageId] = useState(lead.stageId || stages[0].id);
   const [confirmDel, setConfirmDel] = useState(false);
+  const phone = phoneOf(contact);
+  const email = emailOf(contact);
 
   const save = () => onSave({ id: isNew ? undefined : lead.id, name: name.trim(), contact: contact.trim(), source: source.trim(), value: value.toString().trim(), note, stageId });
 
   return (
     <Modal open onClose={onClose} title={isNew ? "New lead" : "Lead"} onSubmit={() => { if (name.trim()) save(); }}>
       <Field label="Name"><input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Who is this lead" /></Field>
-      <Field label="Contact (phone / WhatsApp / email)"><input value={contact} onChange={(e) => setContact(e.target.value)} placeholder="+44 7... or name@email.com" /></Field>
+      <Field label="Contact (phone, email, or both)"><input value={contact} onChange={(e) => setContact(e.target.value)} placeholder="+44 7700 900123, name@email.com" /></Field>
       <div className="lead-two">
         <Field label="Source"><input value={source} onChange={(e) => setSource(e.target.value)} placeholder="Facebook ad" /></Field>
         <Field label="Value (£)"><input value={value} onChange={(e) => setValue(e.target.value)} placeholder="0" inputMode="numeric" /></Field>
@@ -219,10 +238,11 @@ function LeadModal({ lead, stages, onClose, onSave, onDelete, onMove }) {
         </div>
       </Field>
 
-      {!isNew && isPhone(contact) && (
+      {!isNew && (phone || email) && (
         <div className="lead-modal-actions-quick">
-          <a className="q wa" href={`https://wa.me/${digits(contact).replace(/^\+/, "")}`} target="_blank" rel="noreferrer"><MessageCircle size={15} /> WhatsApp</a>
-          <a className="q" href={`tel:${digits(contact)}`}><Phone size={14} /> Call</a>
+          {phone && <a className="q wa" href={`https://wa.me/${phone.replace(/^\+/, "")}`} target="_blank" rel="noreferrer"><MessageCircle size={15} /> WhatsApp</a>}
+          {phone && <a className="q" href={`tel:${phone}`}><Phone size={14} /> Call</a>}
+          {email && <a className="q" href={`mailto:${email}`}><Mail size={14} /> Email</a>}
         </div>
       )}
 
