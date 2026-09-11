@@ -50,7 +50,9 @@ export function AlertBar({ alerts = [], openCount = 0, onOpen, meetings = [], us
   const incoming = (meetings || []).filter((m) => m.toId === myId && m.status === "pending");
   const acceptedForMe = (meetings || []).filter((m) => m.fromId === myId && m.status === "accepted" && !m.seenByFrom);
   const declinedForMe = (meetings || []).filter((m) => m.fromId === myId && m.status === "declined" && !m.seenByFrom);
-  const hasMeeting = incoming.length || acceptedForMe.length || declinedForMe.length;
+  // A cancellation is told to whoever did not do the cancelling.
+  const cancelledForMe = (meetings || []).filter((m) => m.status === "cancelled" && m.cancelledBy && m.cancelledBy !== myId && !m.seenCancel);
+  const hasMeeting = incoming.length || acceptedForMe.length || declinedForMe.length || cancelledForMe.length;
   if (!alerts.length && !openCount && !hasMeeting) return null;
   const nameOf = (id) => users.find((u) => u.id === id)?.name || "Someone";
 
@@ -71,7 +73,10 @@ export function AlertBar({ alerts = [], openCount = 0, onOpen, meetings = [], us
     <div className={"alert-bar" + (unseen.length ? " has-new" : "")}>
       {incoming.map((m) => (
         <div key={m.id} className="alert-meeting">
-          <CalendarClock size={13} /> <span>{nameOf(m.fromId)} wants to meet {prettyDate(m.date)}, {localRange(m)}{m.note ? ` · ${m.note}` : ""}</span>
+          <CalendarClock size={13} /> <span>
+            {nameOf(m.fromId)} {m.counteredAt ? "suggests a new time" : "wants to meet"} {prettyDate(m.date)}, {localRange(m)}
+            {m.title ? ` · ${m.title}` : ""}
+          </span>
           <button className="meet-yes" onClick={() => onRespondMeeting(m.id, "accepted")}><Check size={13} /> Accept</button>
           <button className="meet-no" onClick={() => onRespondMeeting(m.id, "declined")} aria-label="Decline"><X size={14} /></button>
         </div>
@@ -85,6 +90,12 @@ export function AlertBar({ alerts = [], openCount = 0, onOpen, meetings = [], us
       {declinedForMe.map((m) => (
         <div key={m.id} className="alert-meeting no">
           <span>{nameOf(m.toId)} can't make {prettyDate(m.date)}</span>
+          <button className="meet-no" onClick={() => onDismissMeeting(m.id)} aria-label="Dismiss"><X size={14} /></button>
+        </div>
+      ))}
+      {cancelledForMe.map((m) => (
+        <div key={m.id} className="alert-meeting no">
+          <span>{nameOf(m.cancelledBy)} cancelled {m.title ? `"${m.title}"` : "the meeting"} on {prettyDate(m.date)}</span>
           <button className="meet-no" onClick={() => onDismissMeeting(m.id)} aria-label="Dismiss"><X size={14} /></button>
         </div>
       ))}

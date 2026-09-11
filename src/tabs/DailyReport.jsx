@@ -7,7 +7,7 @@ import { addDays, todayStr, dateDiff, prettyDate } from "../lib/dates";
 import { Schedule } from "./Schedule";
 
 import { nameStyle } from "../lib/shop";
-export function DailyReport({ users: allUsers, me, habits, tasks, focus = [], work = [], schedules = {}, setSchedules, meetings = [], onPropose }) {
+export function DailyReport({ users: allUsers, me, habits, tasks, focus = [], work = [], schedules = {}, setSchedules, meetings = [], onPropose, onRespond, onCancelMeeting, onCounterMeeting, plans = {}, setPlans }) {
   const users = (allUsers || []).filter((u) => !u.hidden || u.id === me.id);
   const [day, setDay] = useState(addDays(todayStr(), -1));
   const isYesterday = day === addDays(todayStr(), -1);
@@ -28,7 +28,7 @@ export function DailyReport({ users: allUsers, me, habits, tasks, focus = [], wo
 
   return (
     <div className="page">
-      <PageHead title="Daily report" subtitle={isYesterday ? "Yesterday" : prettyDate(day)}>
+      <PageHead title="Daily" subtitle={isYesterday ? "Yesterday" : prettyDate(day)}>
         <div className="week-nav">
           <IconBtn onClick={() => setDay(addDays(day, -1))}><ChevronLeft size={18} /></IconBtn>
           <IconBtn disabled={!canForward} onClick={() => setDay(addDays(day, 1))}><ChevronRight size={18} /></IconBtn>
@@ -61,7 +61,9 @@ export function DailyReport({ users: allUsers, me, habits, tasks, focus = [], wo
       </div>
 
       <div className="settings-divider">Availability</div>
-      <Schedule users={users} me={me} schedules={schedules} setSchedules={setSchedules} meetings={meetings} onPropose={onPropose} />
+      <Schedule users={users} me={me} schedules={schedules} setSchedules={setSchedules} meetings={meetings}
+        onPropose={onPropose} onRespond={onRespond} onCancel={onCancelMeeting} onCounter={onCounterMeeting}
+        plans={plans} setPlans={setPlans} tasks={tasks} />
     </div>
   );
 }

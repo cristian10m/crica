@@ -799,6 +799,7 @@ export function GlobalStyle() {
     .avail-key { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; color: var(--ink-3); }
     .avail-key i { width: 14px; height: 5px; border-radius: 3px; flex: none; }
     .avail-key i.free { width: 12px; height: 12px; border-radius: 4px; background: #34C759; }
+    .avail-key i.meet { width: 12px; height: 12px; border-radius: 4px; background: #5e5ce6; }
     .avail-key-note { margin-left: auto; font-size: 11px; color: var(--ink-3); font-style: italic; }
 
     .avail-axis { display: flex; align-items: center; gap: 10px; height: 16px; margin-bottom: 3px; }
@@ -809,7 +810,9 @@ export function GlobalStyle() {
     .avail-axis-lab.start { transform: none; }
     .avail-axis-lab.end { transform: translateX(-100%); }
 
-    .avail-day { border-radius: 10px; padding: 2px 4px; margin: 0 -4px; transition: background .15s; }
+    .avail-day { border-radius: 10px; padding: 2px 4px; margin: 0 -4px; cursor: pointer; transition: background .15s; }
+    .avail-day:hover { background: var(--line-2); }
+    .avail-day.today:hover { background: rgba(0,113,227,0.1); }
     .avail-day.today { background: rgba(0,113,227,0.06); }
     html.crica-dark .avail-day.today { background: rgba(0,113,227,0.12); }
     .avail-row { display: flex; align-items: center; gap: 10px; padding: 4px 0; }
@@ -828,8 +831,15 @@ export function GlobalStyle() {
     .avail-busy { position: absolute; height: 5px; border-radius: 3px; opacity: 0.95; }
     .avail-busy.lane0 { top: 3px; }
     .avail-busy.lane1 { bottom: 3px; }
-    .avail-meet { position: absolute; top: 0; bottom: 0; border-radius: 6px; border: 2px solid var(--blue); background: rgba(0,113,227,0.16); }
-    .avail-meet.accepted { border-color: #34C759; background: rgba(52,199,89,0.2); }
+    /* Meetings get their own hue (indigo) so they read as a third thing, not as
+       a variation of somebody's busy time or of the shared free block. Pending is
+       hatched and outlined, confirmed is solid. */
+    .avail-meet { position: absolute; top: -3px; bottom: -3px; border-radius: 7px; z-index: 3;
+      border: 2px solid #5e5ce6; box-shadow: 0 0 0 2px var(--surface);
+      background-color: var(--surface);
+      background-image: repeating-linear-gradient(135deg, rgba(94,92,230,0.42) 0 4px, transparent 4px 8px); }
+    .avail-meet.accepted { background-color: #5e5ce6; background-image: none; }
+    .avail-day.today .avail-meet { box-shadow: 0 0 0 2px var(--bg); }
 
     /* Now marker. Deliberately ink rather than red or amber: those already mean
        overdue and attention here, and one of you may pick a red display colour. */
@@ -866,6 +876,84 @@ export function GlobalStyle() {
     html.crica-dark .avail-meet-chip.accepted { color: #45d869; }
     .avail-meet-chip svg { color: inherit; }
     .avail-meet-chip i { font-style: normal; font-weight: 500; opacity: 0.75; }
+    .avail-plan-chip { display: inline-flex; align-items: center; gap: 6px; min-width: 0; max-width: 300px; font-size: 11.5px;
+      font-weight: 500; padding: 3px 10px; border-radius: 999px; background: var(--line-2); color: var(--ink-2); }
+    .avail-plan-chip i { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+    /* The text needs its own box: ellipsis does not apply to a flex container's
+       own text, so without this the plan is cut off mid-word with no marker. */
+    .avail-plan-chip > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .avail-plan-chip b { flex: none; font-size: 10px; font-weight: 800; line-height: 1; padding: 3px 5px; border-radius: 5px;
+      background: var(--surface); color: var(--ink-2); }
+
+    /* Day panel */
+    .day-free { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: #2ba84a;
+      background: rgba(52,199,89,0.1); border-radius: 11px; padding: 10px 12px; margin-bottom: 4px; }
+    html.crica-dark .day-free { color: #45d869; }
+    .day-free.none { color: var(--ink-3); background: var(--line-2); font-weight: 500; }
+    .day-free svg { color: currentColor; flex: none; }
+    .day-sec { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-3);
+      margin: 18px 0 8px; }
+    .day-meet { border: 1px solid var(--line); border-left: 3px solid var(--blue); border-radius: 12px; padding: 11px 13px; margin-bottom: 8px; }
+    .day-meet.accepted { border-left-color: #34C759; }
+    .day-meet-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+    .day-meet-title { font-size: 14.5px; font-weight: 700; color: var(--ink); }
+    .day-meet-status { flex: none; font-size: 11px; font-weight: 700; color: var(--blue); }
+    .day-meet-status.accepted { color: #2ba84a; }
+    html.crica-dark .day-meet-status.accepted { color: #45d869; }
+    .day-meet-time { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--ink-2); margin-top: 5px; }
+    .day-meet-note { font-size: 13px; color: var(--ink-2); line-height: 1.5; margin: 8px 0 0; white-space: pre-wrap; }
+    .day-meet-actions { display: flex; gap: 8px; margin-top: 11px; }
+    .day-meet-no { border: 1px solid var(--line); background: transparent; color: var(--ink-2); font-family: inherit;
+      font-weight: 600; font-size: 12px; padding: 4px 12px; border-radius: 999px; cursor: pointer; }
+    .day-meet-no:hover { color: #ff3b30; border-color: #ff3b3055; }
+    .day-meet-alt { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line); background: transparent;
+      color: var(--ink-2); font-family: inherit; font-weight: 600; font-size: 12px; padding: 4px 12px; border-radius: 999px; cursor: pointer; }
+    .day-meet-alt:hover { color: #5e5ce6; border-color: #5e5ce6; }
+    .day-meet-kill { border: none; background: rgba(255,59,48,0.12); color: #ff3b30; font-family: inherit;
+      font-weight: 700; font-size: 12px; padding: 5px 13px; border-radius: 999px; cursor: pointer; }
+    .day-meet-kill:hover { background: rgba(255,59,48,0.2); }
+    .day-meet.pending { border-left-style: dashed; }
+    .day-propose { display: inline-flex; align-items: center; gap: 7px; width: 100%; justify-content: center;
+      border: 1.5px dashed var(--line); background: transparent; color: var(--ink-2); font-family: inherit;
+      font-size: 13px; font-weight: 600; padding: 10px 14px; border-radius: 11px; cursor: pointer; transition: all .15s; }
+    .day-propose:hover { color: var(--blue); border-color: var(--blue); }
+
+    .day-plan { border-radius: 12px; background: var(--line-2); padding: 11px 13px; margin-bottom: 8px; }
+    .day-plan-who { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 700; color: var(--ink); margin-bottom: 7px; }
+    .day-plan-text { font-size: 13.5px; color: var(--ink-2); line-height: 1.55; margin: 0; white-space: pre-wrap; }
+    .day-plan.mine { background: rgba(0,113,227,0.06); }
+    html.crica-dark .day-plan.mine { background: rgba(0,113,227,0.12); }
+    .day-plan textarea { width: 100%; border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+      border-radius: 10px; padding: 10px 11px; font-size: 14px; line-height: 1.5; resize: vertical; }
+    .day-plan textarea:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px rgba(0,113,227,0.15); }
+    .day-plan-save { display: flex; justify-content: flex-end; gap: 8px; margin-top: 9px; }
+    .day-tasks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+    .day-task-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; font-size: 12px; font-weight: 600;
+      padding: 5px 11px; border-radius: 9px; background: var(--surface); border: 1px solid var(--line); color: var(--ink-2); }
+    .day-task-chip svg { color: #34C759; flex: none; }
+    .day-task-pick { display: inline-flex; align-items: center; gap: 6px; margin-top: 9px; border: 1.5px dashed var(--line);
+      background: transparent; color: var(--ink-2); font-family: inherit; font-size: 12.5px; font-weight: 600;
+      padding: 7px 13px; border-radius: 10px; cursor: pointer; transition: all .15s; }
+    .day-task-pick:hover { color: var(--blue); border-color: var(--blue); }
+
+    /* Task picker */
+    .pick-group { font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .07em;
+      color: var(--ink-3); margin: 14px 0 7px; }
+    .pick-group:first-of-type { margin-top: 0; }
+    .pick-list { display: flex; flex-direction: column; gap: 6px; }
+    .pick-row { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; cursor: pointer;
+      border: 1.5px solid var(--line); background: var(--surface); border-radius: 12px; padding: 11px 13px;
+      font-family: inherit; font-size: 14px; color: var(--ink); transition: border-color .15s, background .15s; }
+    .pick-row:hover { border-color: var(--blue); }
+    .pick-row.on { border-color: var(--blue); background: rgba(0,113,227,0.06); }
+    .pick-box { width: 20px; height: 20px; flex: none; border-radius: 6px; border: 1.5px solid var(--line);
+      display: grid; place-items: center; color: #fff; transition: background .15s, border-color .15s; }
+    .pick-row.on .pick-box { background: var(--blue); border-color: var(--blue); }
+    .pick-title { flex: 1; min-width: 0; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pick-tag { display: inline-flex; align-items: center; gap: 4px; flex: none; font-size: 10.5px; font-weight: 700;
+      padding: 3px 8px; border-radius: 999px; background: rgba(255,59,48,0.1); color: #ff3b30; }
+    .pick-due { flex: none; font-size: 11px; font-weight: 700; color: var(--ink-3); }
+    .pick-due.late { color: #ff3b30; }
 
     @media (max-width: 700px) {
       .avail-row { flex-wrap: wrap; }

@@ -11,6 +11,7 @@ import { usePipWindow, PipMini } from "./components/PipMini";
 import { StopModal } from "./components/StopModal";
 import { Sidebar } from "./components/Sidebar";
 import { WeekGoal, GOAL_REWARD } from "./components/WeekGoal";
+import { TaskPickModal, planOf, writePlan } from "./components/DayPlanPicker";
 import { createPortal } from "react-dom";
 import { LoginScreen } from "./screens/LoginScreen";
 import { DbErrorScreen } from "./screens/DbErrorScreen";
@@ -38,10 +39,11 @@ import { DEFAULT_USERS, DEFAULT_FINANCE } from "./lib/constants";
 
 const TABS = [
   { id: "dashboard", label: "Home", icon: Home },
+  // Kept the "report" id so a saved view or deep link still lands here.
+  { id: "report", label: "Daily", icon: CalendarDays },
   { id: "habits", label: "Habits", icon: Repeat },
   { id: "tasks", label: "Tasks", icon: CheckSquare },
   { id: "vault", label: "Company", icon: PiggyBank },
-  { id: "report", label: "Report", icon: CalendarDays },
   { id: "docs", label: "Docs", icon: FileText },
   { id: "tools", label: "Tools", icon: Wrench },
   { id: "leads", label: "Leads", icon: Contact },
@@ -79,12 +81,16 @@ export default function App() {
   const [updates, setUpdatesState] = useState([]);
   const [meetings, setMeetingsState] = useState([]);
   const [schedules, setSchedulesState] = useState({});
+  const [plans, setPlansState] = useState({});
 
   const [dark, setDark] = useState(() => { try { return localStorage.getItem("crica_theme") === "dark"; } catch (e) { return false; } });
   const [notifOn, setNotifOn] = useState(() => typeof Notification !== "undefined" && Notification.permission === "granted");
   const [schedPrompt, setSchedPrompt] = useState(false);
   const [schedChoice, setSchedChoice] = useState(null); // "later" | "done"
   const schedShownRef = useRef(false);
+  const [dayPlanPrompt, setDayPlanPrompt] = useState(false);
+  const dayPlanShownRef = useRef(false);
+  const plansRef = useRef({});
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => { try { return localStorage.getItem("crica_sidebar") === "1"; } catch (e) { return false; } });
   const toggleSidebar = () => setSidebarCollapsed((v) => { const n = !v; try { localStorage.setItem("crica_sidebar", n ? "1" : "0"); } catch (e) { /* ignore */ } return n; });
   const [tasksBoard, setTasksBoard] = useState(null);
@@ -116,11 +122,11 @@ export default function App() {
     setUpdatesState((prev) => { const next = (prev || []).filter((u) => u.id !== id); saveKey("updates", next); return next; });
   }, []);
 
-  const proposeMeeting = useCallback(({ date, start, end, note }) => {
+  const proposeMeeting = useCallback(({ date, title, start, end, note }) => {
     setUsersState((curUsers) => {
       const other = (curUsers || []).find((u) => u.id !== currentUserId);
       if (!other) return curUsers;
-      const rec = { id: uid(), fromId: currentUserId, toId: other.id, date, start, end, note: note || "", status: "pending", createdAt: Date.now() };
+      const rec = { id: uid(), fromId: currentUserId, toId: other.id, date, title: title || "", start, end, note: note || "", status: "pending", createdAt: Date.now() };
       setMeetingsState((prev) => { const next = [...(prev || []), rec]; saveKey("meetings", next); return next; });
       return curUsers;
     });
@@ -129,8 +135,35 @@ export default function App() {
     setMeetingsState((prev) => { const next = (prev || []).map((m) => m.id === id ? { ...m, status, respondedAt: Date.now(), seenByFrom: false } : m); saveKey("meetings", next); return next; });
   }, []);
   const dismissMeeting = useCallback((id) => {
-    setMeetingsState((prev) => { const next = (prev || []).map((m) => m.id === id ? { ...m, seenByFrom: true } : m); saveKey("meetings", next); return next; });
+    setMeetingsState((prev) => { const next = (prev || []).map((m) => m.id === id ? { ...m, seenByFrom: true, seenCancel: true } : m); saveKey("meetings", next); return next; });
   }, []);
+  // Cancelling keeps the record so the other person gets told, it just stops
+  // counting as booked time.
+  const cancelMeeting = useCallback((id) => {
+    setMeetingsState((prev) => {
+      const next = (prev || []).map((m) => m.id === id
+        ? { ...m, status: "cancelled", cancelledBy: currentUserId, cancelledAt: Date.now(), seenCancel: false }
+        : m);
+      saveKey("meetings", next); return next;
+    });
+  }, [currentUserId]);
+  // Suggesting another time hands the request back: whoever moved it becomes the
+  // proposer, so it is the other person's turn to accept.
+  const counterMeeting = useCallback(({ id, title, start, end, note }) => {
+    setMeetingsState((prev) => {
+      const next = (prev || []).map((m) => {
+        if (m.id !== id) return m;
+        const otherId = m.fromId === currentUserId ? m.toId : m.fromId;
+        return {
+          ...m, fromId: currentUserId, toId: otherId,
+          title: title != null ? title : (m.title || ""),
+          note: note != null ? note : (m.note || ""),
+          start, end, status: "pending", counteredAt: Date.now(), seenByFrom: false,
+        };
+      });
+      saveKey("meetings", next); return next;
+    });
+  }, [currentUserId]);
 
   const focusEngine = useFocusEngine({ onBank: bankFocus });
   const pip = usePipWindow();
@@ -230,6 +263,7 @@ export default function App() {
       subscribeKey("updates", (u) => setUpdatesState(u || [])),
       subscribeKey("meetings", (m) => setMeetingsState(m || [])),
       subscribeKey("schedules", (s) => setSchedulesState(s || {})),
+      subscribeKey("plans", (p) => setPlansState(p || {})),
     ];
     return () => unsubs.forEach((u) => { try { u && u(); } catch (e) { /* ignore */ } });
   }, []);
@@ -268,6 +302,43 @@ export default function App() {
   const setClients = (u) => setClientsState((prev) => { const next = typeof u === "function" ? u(prev || []) : u; saveKey("clients", next); return next; });
   const setFinance = (f) => { setFinanceState(f); saveKey("finance", f); };
   const setSchedules = (s) => { setSchedulesState(s); saveKey("schedules", s); };
+  const setPlans = (p) => { setPlansState(p); saveKey("plans", p); };
+  useEffect(() => { plansRef.current = plans || {}; }, [plans]);
+
+  // Once a day, from 3am, ask what you are taking on. Answered or skipped is
+  // remembered per day, and a plan already set counts as answered.
+  useEffect(() => {
+    if (!currentUserId) return;
+    const check = () => {
+      if (new Date().getHours() < 3) return; // the day does not start until 3am here
+      const t = todayStr();
+      if (dayPlanShownRef.current) return;
+      try { if (localStorage.getItem("crica_dayplan_" + currentUserId) === t) return; } catch (e) { /* ignore */ }
+      if (planOf(plansRef.current, t, currentUserId).tasks.length) return;
+      dayPlanShownRef.current = true;
+      setDayPlanPrompt(true);
+    };
+    check();
+    const id = setInterval(check, 60000);
+    const onWake = () => { if (!document.hidden) check(); };
+    document.addEventListener("visibilitychange", onWake);
+    window.addEventListener("focus", onWake);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onWake);
+      window.removeEventListener("focus", onWake);
+    };
+  }, [currentUserId]);
+
+  const savePlanTasks = (date, taskIds) => {
+    const cur = planOf(plans, date, currentUserId);
+    setPlans(writePlan(plans, date, currentUserId, { note: cur.note, tasks: taskIds }));
+  };
+  const finishDayPlanPrompt = (taskIds) => {
+    savePlanTasks(todayStr(), taskIds);
+    try { localStorage.setItem("crica_dayplan_" + currentUserId, todayStr()); } catch (e) { /* ignore */ }
+    setDayPlanPrompt(false);
+  };
 
   const loginAs = (id) => { setCurrentUserId(id); try { localStorage.setItem("crica_user", id); } catch (e) { /* ignore */ } };
   const logout = () => { setCurrentUserId(null); setShowSettings(false); try { localStorage.removeItem("crica_user"); } catch (e) { /* ignore */ } };
@@ -458,7 +529,7 @@ export default function App() {
       case "habits": return <HabitsTab users={users} me={me} habits={habits} setHabits={setHabits} />;
       case "tasks": return <TasksTab users={users} me={me} tasks={tasks} setTasks={setTasks} clients={clients} board={tasksBoard} setBoard={setTasksBoard} onWorkStart={() => pip.openPip()} onWorkEnd={logWork} updates={visibleUpdates} onUpdate={logUpdate} onEditUpdate={editUpdate} onDeleteUpdate={deleteUpdate} onSeenUpdates={markUpdatesSeen} unreadUpdates={unreadUpdates} />;
       case "vault": return <CompanyTab finance={finance} setFinance={setFinance} clients={clients} setClients={setClients} />;
-      case "report": return <DailyReport users={users} me={me} habits={habits} tasks={tasks} focus={focus} work={work} schedules={schedules} setSchedules={setSchedules} meetings={meetings} onPropose={proposeMeeting} />;
+      case "report": return <DailyReport users={users} me={me} habits={habits} tasks={tasks} focus={focus} work={work} schedules={schedules} setSchedules={setSchedules} meetings={meetings} onPropose={proposeMeeting} onRespond={respondMeeting} onCancelMeeting={cancelMeeting} onCounterMeeting={counterMeeting} plans={plans} setPlans={setPlans} />;
       case "docs": return <DocsTab docs={docs} setDocs={setDocs} me={me} users={users} />;
       case "tools": return <ToolsTab />;
       case "leads": return <LeadsTab pipeline={pipeline} setPipeline={setPipeline} me={me} />;
@@ -535,6 +606,12 @@ export default function App() {
           onPause={focusEngine.pause} onResume={focusEngine.resume} onEnd={focusEngine.end}
           onPauseWork={pauseMyWork} onResumeWork={resumeMyWork} onStopWork={promptStopWork}
         />, pip.pipWindow.document.body)}
+
+      {dayPlanPrompt && !schedPrompt && me && (
+        <TaskPickModal open morning date={todayStr()} tasks={tasks} me={me}
+          selected={planOf(plans, todayStr(), currentUserId).tasks}
+          onSave={finishDayPlanPrompt} onClose={() => setDayPlanPrompt(false)} />
+      )}
 
       <Modal open={schedPrompt} locked title="New week ahead">
         <p style={{ margin: "0 0 16px", color: "var(--ink-2)", fontSize: 15, lineHeight: 1.5 }}>
